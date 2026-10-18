@@ -9387,6 +9387,8 @@ UISys.prototype.cycleActiveUnit=function(dir){
     if(u.sel&&u.pid===Game_.playerPid&&!u.dying) sel.push(u);
   }
   if(sel.length<=1) return;
+
+  
   sel.sort(function(a,b){return a.id-b.id;});
   var curIdx=0;
   for(var j=0;j<sel.length;j++){if(sel[j].id===this._activeUnitId){curIdx=j;break;}}
@@ -9395,3 +9397,1185 @@ UISys.prototype.cycleActiveUnit=function(dir){
   if(Renderer_){Game_.camera.x=sel[curIdx].x;Game_.camera.y=sel[curIdx].y;clampCam();}
   this.refreshUnitBar();
 };
+
+
+  <!-- ===== ЧАСТЬ 15r/15 ===== -->
+UISys.prototype.drawPortrait=function(ent){
+  var cv=this.$('portrait-canvas'),info=this.$('portrait-info');
+  if(!cv) return;
+  var ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var bgGrad=ctx.createLinearGradient(0,0,0,cv.height);
+  bgGrad.addColorStop(0,'#1a2438');bgGrad.addColorStop(1,'#050810');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,cv.width,cv.height);
+  if(!ent){info.innerHTML='<div class="pname">—</div>';return;}
+  try{
+    if(ent.isUnit){
+      var useDir=((ent.role==='cav')||(ent.role==='siege'))?DIR.RIGHT:DIR.DOWN;
+      var sp=bakeUnit(ent.race,ent.role,ent.team,useDir);
+      var pad=14;
+      var s=Math.min((cv.width-pad*2)/sp.width,(cv.height-pad*2)/sp.height);
+      var dw=sp.width*s,dh=sp.height*s,dx=(cv.width-dw)/2,dy=(cv.height-dh)/2;
+      var legDef=getLeg(ent.role);
+      if(legDef&&ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'){
+        var legW=legDef.w*s*0.9,legH=legDef.h*s*0.85,legSpread=legDef.spread*s*0.8;
+        var legBottomY=dy+dh,legTopY=legBottomY-legH,pcx=cv.width/2;
+        ctx.fillStyle='#3a2010';ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(0.5,s*0.6);
+        ctx.fillRect(pcx-legSpread-legW/2,legTopY,legW,legH);ctx.strokeRect(pcx-legSpread-legW/2,legTopY,legW,legH);
+        ctx.fillRect(pcx+legSpread-legW/2,legTopY,legW,legH);ctx.strokeRect(pcx+legSpread-legW/2,legTopY,legW,legH);
+      }
+      ctx.drawImage(sp,dx,dy,dw,dh);
+      if(ent.role==='siege'){
+        var btmY2=dy+dh*0.98;
+        var wR2=(ent.race==='gromborn'?12:ent.race==='luminite'?13:11)*s;
+        var wheelY2=btmY2-wR2;
+        var wheelX1b=cv.width/2-22*s, wheelX2b=cv.width/2+22*s;
+        var drawW2=function(wx,wy,r){
+          if(ent.race==='gromborn'){
+            ctx.fillStyle='#2a2a2a';ctx.beginPath();ctx.arc(wx,wy,r,0,TAU);ctx.fill();
+            ctx.strokeStyle='#0a0a0a';ctx.lineWidth=2.2*s;ctx.stroke();
+            ctx.strokeStyle='#6a6a6a';ctx.lineWidth=1.6*s;
+            for(var k=0;k<6;k++){var a=k/6*TAU;ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+Math.cos(a)*r*0.85,wy+Math.sin(a)*r*0.85);ctx.stroke();}
+            ctx.fillStyle='#8a8a8a';ctx.beginPath();ctx.arc(wx,wy,r*0.3,0,TAU);ctx.fill();
+            ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1.2*s;ctx.stroke();
+          } else if(ent.race==='luminite'){
+            ctx.fillStyle='#4a2a10';ctx.beginPath();ctx.arc(wx,wy,r,0,TAU);ctx.fill();
+            ctx.strokeStyle='#1a0804';ctx.lineWidth=2*s;ctx.stroke();
+            ctx.strokeStyle='#8a5a30';ctx.lineWidth=2*s;
+            for(var k2=0;k2<8;k2++){var a2=k2/8*TAU;ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+Math.cos(a2)*r*0.85,wy+Math.sin(a2)*r*0.85);ctx.stroke();}
+            ctx.fillStyle='#c8a878';ctx.beginPath();ctx.arc(wx,wy,r*0.28,0,TAU);ctx.fill();
+            ctx.strokeStyle='#3a2010';ctx.lineWidth=1.2*s;ctx.stroke();
+          }
+        };
+        if(ent.race!=='sylvanid'){drawW2(wheelX1b,wheelY2,wR2);drawW2(wheelX2b,wheelY2,wR2);}
+      }
+      if(ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'&&Renderer_){
+        var tempU={role:ent.role,race:ent.race,isHero:ent.isHero,team:ent.team,walkPhase:0,walkOffset:0,moving:false,attackT:0,chopT:0,castT:0,animT:0,x:0,y:0};
+        var pObj={x:cv.width/2,y:dy+dh};
+        var hand=Renderer_._armsCtx(ctx,tempU,pObj,s,false,1);
+        if(hand){
+          ctx.save();ctx.translate(hand.x,hand.y);
+          Renderer_._mainW(ctx,ent.role,ent.race,0,0,0,s);
+          ctx.restore();
+        }
+      }
+      var isOwnEnt=(ent.team===Game_.playerTeam&&ent.pid===Game_.playerPid);
+      var name=ent.isHero?('⭐ '+uName(ent.race,'hero')):uName(ent.race,ent.role);
+      var extra=ent.isHero?(' Ур.'+ent.level):'';
+      var ownerTag=isOwnEnt?'':' <span style="color:#ff8080">[T'+(ent.team+1)+']</span>';
+      var html='<div class="pname">'+name+extra+ownerTag+'</div>';
+      var hpPct=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpCol=hpPct>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPct>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      html+='<div class="pbar"><div class="fill" style="width:'+hpPct+'%;background:'+hpCol+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      if(ent.maxMana>0){
+        var mpPct=Math.max(0,Math.min(100,Math.round((ent.mana||0)/ent.maxMana*100)));
+        html+='<div class="pbar"><div class="fill" style="width:'+mpPct+'%;background:linear-gradient(90deg,#2a4a9a,#80c0ff)"></div><div class="lbl">MP '+Math.floor(ent.mana||0)+'/'+ent.maxMana+'</div></div>';
+      }
+      if(ent.isHero){
+        var needXP=ent.level*ent.level*30+40;
+        var prevXP=(ent.level-1)*(ent.level-1)*30+40;
+        var xpPct=Math.max(0,Math.min(100,Math.round((ent.exp-prevXP)/(needXP-prevXP)*100)));
+        html+='<div class="pbar"><div class="fill" style="width:'+xpPct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">XP '+xpPct+'%</div></div>';
+      }
+      var regenHp=(ent.raceRegen||0)+(ent.regenPassive||0);
+      var regenMp=0;
+      if(ent.isHero) regenMp=3;
+      else if(ent.isHealer) regenMp=HEALER_MANA_REGEN;
+      var rows='';
+      if(regenHp>0) rows+='<div class="prow"><span>+HP/с:</span><span class="v">'+regenHp.toFixed(1)+'</span></div>';
+      if(regenMp>0) rows+='<div class="prow"><span>+MP/с:</span><span class="v">'+regenMp.toFixed(1)+'</span></div>';
+      rows+='<div class="prow"><span>Урон:</span><span class="v">'+ent.dmg+'</span></div>';
+      rows+='<div class="prow"><span>Броня:</span><span class="v">'+(ent.armor||1).toFixed(2)+'</span></div>';
+      html+=rows;
+      if(ent.isHero&&ent.heroAbilities){
+        html+='<div style="margin-top:4px;border-top:1px solid #3d4c68;padding-top:4px">';
+        for(var _ha=0;_ha<ent.heroAbilities.length;_ha++){
+          var _ab=ent.heroAbilities[_ha];
+          var _abLvl=ent.abilityLevels[_ab.id]||0;
+          var _abName=t_(_ab.k);
+          html+='<div style="font-size:9px;color:'+(_abLvl>0?'#ffe9a8':'#666')+';line-height:1.3;margin-bottom:2px">'+_abName+' '+_abLvl+'/3</div>';
+        }
+        html+='</div>';
+      }
+      info.innerHTML=html;
+    } else if(ent.isCreep){
+      var spC=bakeCreep(ent.kind);
+      var sC=Math.min((cv.width-16)/spC.width,(cv.height-16)/spC.height);
+      ctx.drawImage(spC,(cv.width-spC.width*sC)/2,(cv.height-spC.height*sC)/2,spC.width*sC,spC.height*sC);
+      var hpPctC=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpColC=hpPctC>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPctC>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      var creepName=ent.kind==='wolf'?'Волк':ent.kind==='bear'?'Медведь':ent.kind==='boar'?'Кабан':ent.kind==='spider'?'Паук':'Бандит';
+      var htmlC='<div class="pname">'+creepName+' Lv.'+ent.level+(ent.isBoss?' <span style="color:#ffd000">BOSS</span>':'')+'</div>';
+      htmlC+='<div class="pbar"><div class="fill" style="width:'+hpPctC+'%;background:'+hpColC+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      htmlC+='<div class="prow"><span>Урон:</span><span class="v">'+ent.dmg+'</span></div>';
+      htmlC+='<div class="prow"><span>Броня:</span><span class="v">'+(ent.armor||1).toFixed(2)+'</span></div>';
+      htmlC+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.range+'</span></div>';
+      htmlC+='<div class="prow"><span>Награда:</span><span class="v">'+ent.goldReward+'</span></div>';
+      info.innerHTML=htmlC;
+    } else {
+      var sp2=bakeBuilding(ent.race,ent.kind,ent.team,ent.towerUpgrade);
+      var s2=Math.min((cv.width-16)/sp2.width,(cv.height-16)/sp2.height);
+      ctx.drawImage(sp2,(cv.width-sp2.width*s2)/2,(cv.height-sp2.height*s2)/2,sp2.width*s2,sp2.height*s2);
+      var hpPctB=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpColB=hpPctB>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPctB>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      var ownerTag2=(ent.team===Game_.playerTeam&&ent.pid===Game_.playerPid)?'':' <span style="color:#ff8080">[T'+(ent.team+1)+']</span>';
+      var towerUpTag='';
+      if(ent.kind==='tower'&&ent.towerUpgrade){
+        var tuInfoB=TOWER_UPGRADES[ent.race]&&TOWER_UPGRADES[ent.race][ent.towerUpgrade];
+        towerUpTag=' <span style="color:#a0c0ff;font-size:9px">('+(tuInfoB?(LC==='en'?tuInfoB.nameEn:tuInfoB.name):'')+')</span>';
+      }
+      var htmlB='<div class="pname">'+bldName(ent.race,ent.kind)+towerUpTag+ownerTag2+'</div>';
+      htmlB+='<div class="pbar"><div class="fill" style="width:'+hpPctB+'%;background:'+hpColB+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      if(!ent.completed){
+        var bpPct=Math.max(0,Math.min(100,Math.round(ent.buildProgress/ent.buildTime*100)));
+        htmlB+='<div class="pbar"><div class="fill" style="width:'+bpPct+'%;background:linear-gradient(90deg,#8a6a1a,#e6c67a)"></div><div class="lbl">Стройка '+bpPct+'%</div></div>';
+      } else if(ent.atk){
+        htmlB+='<div class="prow"><span>Урон:</span><span class="v">'+ent.atk+'</span></div>';
+        htmlB+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.rng+'</span></div>';
+      } else if(ent.pop){
+        htmlB+='<div class="prow"><span>Еда:</span><span class="v">+'+ent.pop+'</span></div>';
+      }
+      if(ent.level>1) htmlB+='<div class="prow"><span>Уровень:</span><span class="v">'+ent.level+'</span></div>';
+      info.innerHTML=htmlB;
+    }
+  }catch(e){ERR('drawPortrait',e);}
+};
+UISys.prototype.drawMinePortrait=function(res,workersList){
+  var cv=this.$('portrait-canvas'),info=this.$('portrait-info');
+  if(!cv) return;
+  var ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var bgGrad=ctx.createLinearGradient(0,0,0,cv.height);
+  bgGrad.addColorStop(0,'#1a2438');bgGrad.addColorStop(1,'#050810');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,cv.width,cv.height);
+  var sp=bakeResource(res.kind);
+  var s=Math.min((cv.width-16)/sp.width,(cv.height-16)/sp.height);
+  ctx.drawImage(sp,(cv.width-sp.width*s)/2,(cv.height-sp.height*s)/2,sp.width*s,sp.height*s);
+  var pct=Math.max(0,Math.min(100,Math.round(res.amount/res.maxAmount*100)));
+  var html='<div class="pname">'+(res.kind==='gold'?t_('goldMine'):t_('treeRes'))+'</div>';
+  html+='<div class="pbar"><div class="fill" style="width:'+pct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">'+Math.floor(res.amount)+'</div></div>';
+  html+='<div class="prow"><span>Рабочих:</span><span class="v">'+workersList.length+'</span></div>';
+  if(res.kind==='gold'){
+    var inCnt=0,waitCnt=0;
+    for(var i=0;i<workersList.length;i++){if(workersList[i]._insideMine) inCnt++;else if(workersList[i]._waitingForMine) waitCnt++;}
+    html+='<div class="prow"><span>Внутри:</span><span class="v">'+inCnt+'/'+MAX_GATHER_PER_MINE+'</span></div>';
+    html+='<div class="prow"><span>В очереди:</span><span class="v">'+waitCnt+'</span></div>';
+  }
+  info.innerHTML=html;
+};
+UISys.prototype._refreshPortraitBars=function(){
+  if(!Game_) return;
+  var g=Game_,ent=null;
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.sel&&u.pid===g.playerPid&&!u.dying){ent=u;break;}
+  }
+  if(!ent&&this._inspectEnt) ent=this._inspectEnt;
+  if(!ent){for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid){ent=b;break;}}}
+  if(!ent) return;
+  var info=this.$('portrait-info');if(!info) return;
+  var bars=info.querySelectorAll('.pbar');
+  if(!bars.length) return;
+  if(bars[0]){
+    var hpPct=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+    var hpFill=bars[0].querySelector('.fill');
+    var hpLbl=bars[0].querySelector('.lbl');
+    if(hpFill) hpFill.style.width=hpPct+'%';
+    if(hpLbl) hpLbl.textContent='HP '+Math.ceil(ent.hp)+'/'+ent.maxHp;
+    var hpCol=hpPct>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPct>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+    if(hpFill) hpFill.style.background=hpCol;
+  }
+  if(ent.maxMana>0&&bars[1]){
+    var mpPct=Math.max(0,Math.min(100,Math.round((ent.mana||0)/ent.maxMana*100)));
+    var mpFill=bars[1].querySelector('.fill');
+    var mpLbl=bars[1].querySelector('.lbl');
+    if(mpFill) mpFill.style.width=mpPct+'%';
+    if(mpLbl) mpLbl.textContent='MP '+Math.floor(ent.mana||0)+'/'+ent.maxMana;
+  }
+  if(ent.isHero){
+    var xpBarIdx=ent.maxMana>0?2:1;
+    if(bars[xpBarIdx]){
+      var needXP=ent.level*ent.level*30+40;
+      var prevXP=(ent.level-1)*(ent.level-1)*30+40;
+      var xpPct2=Math.max(0,Math.min(100,Math.round((ent.exp-prevXP)/(needXP-prevXP)*100)));
+      var xpFill=bars[xpBarIdx].querySelector('.fill');
+      var xpLbl=bars[xpBarIdx].querySelector('.lbl');
+      if(xpFill) xpFill.style.width=xpPct2+'%';
+      if(xpLbl) xpLbl.textContent='XP '+xpPct2+'%';
+    }
+  }
+};
+UISys.prototype.addAction=function(box,icon,label,price,fn,active,disabled,tooltip,cls){
+  var btn=document.createElement('button');
+  btn.className='act-btn'+(active?' active':'')+(cls?' '+cls:'');
+  if(disabled) btn.disabled=true;
+  var html='';
+  if(icon) html+='<div class="ico">'+icon+'</div>';
+  html+='<div class="lbl">'+label+'</div>';
+  if(price) html+='<div class="price">'+price+'</div>';
+  btn.innerHTML=html;
+  btn.onclick=function(){if(disabled) return;Audio.sfx('click');fn();};
+  if(tooltip) btn.title=tooltip;
+  if(tooltip && Settings._isMobile){
+    (function(tipText){
+      var tipTimer=null;
+      btn.addEventListener('touchstart',function(e){
+        tipTimer=setTimeout(function(){
+          var mt=document.getElementById('mobile-tip');
+          if(!mt) return;
+          mt.textContent=tipText;
+          var r=btn.getBoundingClientRect();
+          var tw=Math.min(window.innerWidth*0.85,280);
+          var tx=r.left+r.width/2-tw/2;
+          if(tx<8) tx=8;
+          if(tx+tw>window.innerWidth-8) tx=window.innerWidth-tw-8;
+          mt.style.width=tw+'px';
+          mt.style.left=tx+'px';
+          mt.style.top='';
+          mt.style.bottom='20px';
+          mt.classList.add('show');
+          if(navigator.vibrate) navigator.vibrate(15);
+        },650);
+      },{passive:true});
+      btn.addEventListener('touchend',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+      btn.addEventListener('touchmove',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+      btn.addEventListener('touchcancel',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+    })(tooltip);
+  }
+  box.appendChild(btn);return btn;
+};
+UISys.prototype.getActionsHash=function(){
+  if(!Game_) return '';
+  var g=Game_,parts=[];
+  for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+Math.floor(u.cdA1/0.5)+'|'+Math.floor(u.cdA2/0.5)+'|'+Math.floor(u.cdUlt/0.5)+'|'+(u.ultUnlocked?1:0)+'|'+Math.floor((u.mana||0)/5));}
+  for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid){var q='';for(var qi=0;qi<b.queue.length;qi++) q+=b.queue[qi].role.charAt(0);parts.push('b'+b.id+'|'+b.kind+'|'+b.queue.length+'|'+q+'|'+(b.upgrading?1:0)+'|'+b.level+'|'+(b.techUpgrading?(b.techUpgrading.role+'.'+b.techUpgrading.stat+'.'+Math.floor(b.techUpgrading.timeLeft)):'')+'|'+(b.completed?1:0)+'|'+(b.rallyPoint?('R'+Math.round(b.rallyPoint.x)+','+Math.round(b.rallyPoint.y)):'')+'|'+(b.sawmillLevel||0)+'|'+(b.sawmillUpgrading?Math.floor(b.sawmillUpgradeTimeLeft):0)+'|'+(b.reviveQueue&&b.reviveQueue.length?Math.floor(b.reviveQueue[0].timeLeft):0)+'|'+(b.towerUpgrade||'')+'|'+(b._pendingUpgrade||''));}}
+  if(!parts.length) return '';
+  var res=g.getRes(g.playerPid);
+  var dh=g.deadHeroes&&g.deadHeroes[g.playerPid];
+  parts.push('r:'+Math.floor(res.gold/10)+','+Math.floor(res.wood/10)+','+(dh?('H'+dh.level):''));
+  return parts.join(';');
+};
+UISys.prototype.costStr=function(g,w){
+  var s='';
+  if(g) s+='<div>'+g+toolIconImg('gold')+'</div>';
+  if(w) s+='<div>'+w+toolIconImg('wood')+'</div>';
+  return s;
+};
+UISys.prototype.foodStr=function(role){
+  var f=FOOD_COST[role]||1;
+  return '<div>'+f+toolIconImg('meat')+'</div>';
+};
+
+  <!-- ===== ЧАСТЬ 15s/15 ===== -->
+UISys.prototype.canPlaceAt=function(x,y,def){
+  if(!Game_) return false;
+  var g=Game_,size=(def.size||3)*22;
+  if(x<size||y<size||x>g.W-size||y>g.H-size) return false;
+  for(var i=0;i<g.buildings.length;i++){var ob=g.buildings[i],dx=ob.x-x,dy=ob.y-y,rr=ob.radius+size+40;if(dx*dx+dy*dy<rr*rr) return false;}
+  for(i=0;i<g.resources.length;i++){var r=g.resources[i];if(r.dead) continue;var dx2=r.x-x,dy2=r.y-y,rr2=r.radius+size-6;if(dx2*dx2+dy2*dy2<rr2*rr2) return false;}
+  for(i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.pid!==g.playerPid) continue;if(Math.hypot(b.x-x,b.y-y)<700) return true;}
+  return false;
+};
+UISys.prototype.tryPlaceAt=function(x,y){
+  if(!this._placingKind||!Game_) return;
+  var g=Game_,kind=this._placingKind,race=this._placingRace;
+  if(!race){this.cancelPlacement();return;}
+  var def=RACES[race].buildings[kind];if(!def){this.cancelPlacement();return;}
+  if(!this.canPlaceAt(x,y,def)){g.notify(t_('cantBuild'));return;}
+  var res=g.getRes(g.playerPid);
+  if(res.gold<def.gold){g.notify(t_('nGold'));this.cancelPlacement();return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));this.cancelPlacement();return;}
+  var w=null;
+  for(var i2=0;i2<g.units.length;i2++){var u2=g.units[i2];if(u2.sel&&u2.pid===g.playerPid&&u2.role==='worker'&&!u2.dying){w=u2;break;}}
+  if(!w){for(var i3=0;i3<g.units.length;i3++){var u3=g.units[i3];if(u3.pid===g.playerPid&&u3.role==='worker'&&!u3.dying&&!u3.buildTarget&&!u3.repairTarget){w=u3;break;}}}
+  if(!w){g.notify(t_('noWorker'));this.cancelPlacement();return;}
+  var newRad=(def.size||3)*22+24;
+  for(var mv=0;mv<g.units.length;mv++){
+    var mu=g.units[mv];
+    if(mu.pid!==g.playerPid||mu.dying) continue;
+    var mdx=mu.x-x,mdy=mu.y-y,md=Math.hypot(mdx,mdy);
+    if(md<newRad){
+      var mvAng=md>0.01?Math.atan2(mdy,mdx):Math.random()*TAU;
+      mu.moveTo={x:g.clampX(x+Math.cos(mvAng)*(newRad+50)),y:g.clampY(y+Math.sin(mvAng)*(newRad+50))};
+      mu._path=null;mu._pathIdx=0;
+    }
+  }
+  g.subRes(g.playerPid,def.gold,def.wood);
+  var b=new Building(x,y,g.playerTeam,def,race);
+  b.completed=false;b.buildProgress=0;b.owner='player';b.pid=g.playerPid;
+  g.buildings.push(b);g.navDirty=true;
+  w.buildTarget=b;w.gatherTarget=null;w.moveTo=null;w.repairTarget=null;w.demolishTarget=null;w.carrying=null;w.carryAmt=0;w.target=null;w.lockedTarget=null;w.gatherAnimT=0;w.attackMoveTo=null;w.patrolRoute=null;w._stuckTimer=0;w._insideMine=false;w._mineSlot=-1;w._waitingForMine=false;w._path=null;w._pathIdx=0;
+  Audio.sfx('build');this.cancelPlacement();
+};
+UISys.prototype.demolish=function(b){
+  var g=Game_;if(!g||!b||b.kind==='townhall') return;
+  var w=null;
+  for(var ui=0;ui<g.units.length;ui++){var u=g.units[ui];if(u.pid===g.playerPid&&u.role==='worker'&&!u.dying){w=u;break;}}
+  if(!w){g.notify(t_('noWorker'));return;}
+  w.demolishTarget=b;w.buildTarget=null;w.repairTarget=null;w.gatherTarget=null;w._insideMine=false;w._mineSlot=-1;w._waitingForMine=false;
+  this.refreshSelection();
+};
+UISys.prototype.cancelConstruction=function(b){
+  var g=Game_;if(!g||!b) return;
+  g.addRes(g.playerPid,b.costGold||0,b.costWood||0);
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.pid!==g.playerPid||u.dying) continue;
+    if(u.buildTarget===b){
+      u.buildTarget=null;
+      u._path=null;u._pathIdx=0;
+      u.moving=false;
+      u.gatherAnimT=0;u.chopT=0;
+    }
+  }
+  b.dead=true;
+  g.navDirty=true;
+  g.floaters.push(new Floater(b.x,b.y-40,'Отменено','#ffe9a8'));
+  Audio.sfx('click');
+  this.refreshSelection();
+};
+UISys.prototype.upgradeTH=function(b){
+  var g=Game_;if(!g||!b||b.upgrading||b.level>=3) return;
+  if(b.queue&&b.queue.length>0){g.notify('Сначала дождитесь окончания найма');return;}
+  var cost=TH_UPG[b.level];if(!cost) return;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold||res.wood<cost.wood){g.notify(t_('nGold'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);b.upgrading=true;b.upgradeTimeLeft=cost.time;
+  Audio.sfx('upgrade',b.x,b.y);this.renderActions(true);
+};
+UISys.prototype.upgradeUnit=function(role,stat){
+  var g=Game_;if(!g) return;
+  var up=g.getUnitUpgrades(g.playerPid,role);if(up[stat]>=3) return;
+  var cost=UPGRADE_COST[up[stat]],res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<cost.wood){g.notify(t_('nWood'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);up[stat]++;Audio.sfx('upgrade');this.renderActions(true);
+};
+UISys.prototype.queueUnit=function(b,role){
+  var g=Game_;if(!g||!b) return;
+  if(b.kind==='forge'&&b.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  if(b.kind==='townhall'&&b.upgrading){g.notify('Идёт улучшение ратуши');return;}
+  var race=RACES[b.race];if(!race) return;
+  var def=race.units[role];if(!def) return;
+  var res=g.getRes(g.playerPid),reserved=g.getReservedPop(g.playerPid);
+  if(b.queue.length>=10){g.notify(t_('queueFull'));return;}
+  if(res.gold<def.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));return;}
+  var foodCost=FOOD_COST[role]||1;
+  if((res.food+reserved+foodCost)>res.maxFood){g.notify(t_('needHouse'));return;}
+  if(role==='hero'){
+    var alive=0;
+    for(var hi=0;hi<g.units.length;hi++){var hu=g.units[hi];if(hu.isHero&&hu.pid===g.playerPid&&!hu.dying) alive++;}
+    if(alive>=1){g.notify(t_('heroExists'));return;}
+    var heroInQueue=false;
+    for(var hq=0;hq<g.buildings.length;hq++){
+      var hqb=g.buildings[hq];
+      if(hqb.pid!==g.playerPid||hqb.dead) continue;
+      for(var qqi=0;qqi<hqb.queue.length;qqi++){if(hqb.queue[qqi].role==='hero'){heroInQueue=true;break;}}
+      if(hqb.reviveQueue&&hqb.reviveQueue.length>0) heroInQueue=true;
+      if(heroInQueue) break;
+    }
+    if(heroInQueue){g.notify(t_('heroExists'));return;}
+    if(g.deadHeroes&&g.deadHeroes[g.playerPid]&&g.deadHeroes[g.playerPid].race===b.race){g.notify('Используйте Воскресить');return;}
+  }
+  g.subRes(g.playerPid,def.gold,def.wood);
+  b.queue.push({role:role,race:b.race,timeLeft:def.time,timeTotal:def.time});
+  Audio.sfx('click');this.renderActions(true);
+};
+UISys.prototype.startForgeUpgrade=function(b,role,stat){
+  var g=Game_;if(!g||!b||b.kind!=='forge') return;
+  if(b.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  if(b.queue.length>0){g.notify('Идёт найм войск — дождитесь окончания');return;}
+  for(var fi=0;fi<g.buildings.length;fi++){
+    var fb=g.buildings[fi];
+    if(fb.dead||fb.pid!==g.playerPid||fb.kind!=='forge') continue;
+    if(fb.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  }
+  var up=g.getUnitUpgrades(g.playerPid,role);if(up[stat]>=3) return;
+  var cost=UPGRADE_COST[up[stat]],res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<cost.wood){g.notify(t_('nWood'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);
+  var tTime=FORGE_UPG_TIME[up[stat]]||30;
+  b.techUpgrading={role:role,stat:stat,timeLeft:tTime,timeTotal:tTime};
+  Audio.sfx('click');
+  this.renderActions(true);
+};
+UISys.prototype.resurrectHero=function(b){
+  var g=Game_;if(!g||!b) return;
+  var alive=false;
+  for(var ai=0;ai<g.units.length;ai++){var au=g.units[ai];if(au.isHero&&au.pid===g.playerPid&&!au.dying){alive=true;break;}}
+  if(alive){g.notify(t_('heroExists'));return;}
+  var dh=g.deadHeroes?g.deadHeroes[g.playerPid]:null;
+  if(!dh) return;
+  var raceDef=RACES[dh.race];if(!raceDef) return;
+  var hd=raceDef.units.hero;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<hd.gold||res.wood<hd.wood){g.notify(t_('nGold'));return;}
+  if(b.reviveQueue&&b.reviveQueue.length>0){g.notify('Воскрешение уже идёт');return;}
+  g.subRes(g.playerPid,hd.gold,hd.wood);
+  var time=25+2*(dh.level||1);
+  b.reviveQueue=[{role:'hero',race:dh.race,timeLeft:time,timeTotal:time,reviveData:dh}];
+  Audio.sfx('hero');
+  this.renderActions(true);
+};
+UISys.prototype.showBuildMenu=function(){
+  var box=this.$('actions');
+  box.innerHTML='';box.dataset.menu='build';
+  if(!Game_) return;
+  var g=Game_,self=this,race=null;
+  for(var i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+  if(!race) return;
+  var rdef=RACES[race],thLvl=g.getTHLevel(g.playerPid),list=BUILDING_UNLOCK[thLvl]||BUILDING_UNLOCK[1];
+  for(var k=0;k<list.length;k++){
+    (function(kind){
+      var def=rdef.buildings[kind];if(!def) return;
+      var btip=bldName(race,kind)+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+'\nHP: '+def.hp+'\n'+t_('d_'+kind);
+      self.addAction(box,buildingIconImg(race,kind),bldName(race,kind),self.costStr(def.gold,def.wood),function(){self.startPlacement(kind);},false,false,btip);
+    })(list[k]);
+  }
+  var back=document.createElement('button');
+  back.className='act-btn';
+  back.innerHTML='<div class="ico">'+toolIconImg('deselect')+'</div><div class="lbl">'+t_('back')+'</div>';
+  back.onclick=function(){Audio.sfx('click');box.dataset.menu='';self.renderActions(true);};
+  box.appendChild(back);
+};
+UISys.prototype.startPlacement=function(kind){
+  if(!Game_) return;
+  var g=Game_,race=null;
+  for(var i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+  if(!race) return;
+  var def=RACES[race].buildings[kind];if(!def) return;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<def.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));return;}
+  this._placingKind=kind;this._placingRace=race;
+  this.$('place-name').textContent=bldName(race,kind);
+  this.$('placement-bar').classList.add('show');
+  var box=this.$('actions');
+  box.innerHTML='';
+  var cancel=document.createElement('button');
+  cancel.className='act-btn';
+  cancel.innerHTML='<div class="ico">'+toolIconImg('deselect')+'</div><div class="lbl">'+t_('cancel')+'</div>';
+  cancel.onclick=function(){Audio.sfx('click');UI.cancelPlacement();};
+  box.appendChild(cancel);box.dataset.menu='placing';
+};
+UISys.prototype.cancelPlacement=function(){
+  this._placingKind=null;this._placingRace=null;
+  var bar=this.$('placement-bar');if(bar) bar.classList.remove('show');
+  var box=this.$('actions');
+  if(box&&box.dataset.menu==='placing'){box.dataset.menu='';this.renderActions(true);}
+};
+
+
+  <!-- ===== ЧАСТЬ 15t/15 ===== -->
+UISys.prototype.renderActions=function(force){
+  if(!Game_) return;
+  var box=this.$('actions');
+  if(!force&&(box.dataset.menu==='build'||box.dataset.menu==='placing')) return;
+  box.innerHTML='';box.dataset.menu='';
+  var g=Game_,sel=[],selB=[];
+  for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
+  for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
+  var self=this;
+  if(sel.length===1&&sel[0].isHero){
+    var hero=sel[0],abils=hero.heroAbilities;
+    var manaDiv=document.createElement('div');
+    manaDiv.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:4px 6px;background:#0d1420;border:1px solid #3d4c68;border-radius:5px;margin-bottom:4px';
+    var curMana=hero.mana||0,maxMana=Math.max(1,hero.maxMana||100);
+    var manaFillPct=Math.round((curMana/maxMana)*100);
+    var needXP=(hero.level*hero.level*30+40);
+    var prevXP=(hero.level-1)*(hero.level-1)*30+40;
+    var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
+    manaDiv.innerHTML='<span style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div><span style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
+    box.appendChild(manaDiv);
+    for(var ai=0;ai<abils.length;ai++){
+      (function(ab,abIdx){
+        var lvl=hero.abilityLevels[ab.id]||0;
+        var cd=0;
+        if(ab.type==='passive') cd=0;
+        else if(abIdx===0) cd=hero.cdA1;
+        else if(abIdx===1) cd=hero.cdA2;
+        else if(ab.type==='ultimate') cd=hero.cdUlt;
+        var isPassive=(ab.type==='passive');
+        var canLvlUp=hero.skillPoints>0&&lvl<3&&(ab.type!=='ultimate'||hero.ultUnlocked);
+        var hasMana=(curMana)>=(ab.mana||0);
+        var canUse=!isPassive&&lvl>0&&cd<=0&&(ab.type!=='ultimate'||hero.ultUnlocked)&&hasMana;
+        var btnDisabled=!(canLvlUp||canUse);
+        var key=abIdx===0?'[Q] ':abIdx===1?'[W] ':ab.type==='ultimate'?'[R] ':'[E] ';
+        var label=key+t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
+        if(ab.type==='ultimate'&&!hero.ultUnlocked) label+=' (X)';
+        if(canLvlUp) label+=' +';
+        var price='';
+        if(cd>0) price+=Math.ceil(cd)+'с';
+        if(!isPassive) price+= (price?' ':'')+(ab.mana||35)+'маны';
+        var iconName=ab.id;
+        if(iconName==='divine_shield') iconName='shield';
+        if(iconName==='forest_wrath') iconName='forest';
+        var tip=t_('ability_'+ab.id);
+        if(tip==='ability_'+ab.id) tip=ab.id;
+        tip+='\n\n'+(isPassive?'Пассивная. ':'')+'Shift+клик — улучшить до '+(lvl+1)+'/3';
+        if(ab.type==='ultimate'&&!hero.ultUnlocked) tip='Ультимейт откроется на 6 ур.';
+        if(ab.type!=='passive') tip+='\nМана: '+(ab.mana||35)+' · Кулдаун: '+ab.cd+'с';
+        if(ab.targeted) tip+='\nНаводимая: кликните по цели';
+        self.addAction(box,toolIconImg(iconName),label,price,function(){
+          var shift=!!Input.shiftDown;
+          if(canLvlUp&&(shift||!canUse)){hero.abilityLevels[ab.id]=lvl+1;hero.skillPoints--;hero._recalc();self.renderActions(true);}
+          else if(canUse){
+            if(ab.targeted){
+              Input.pendingTargetedAbility={hero:hero,ab:ab};
+              self.showOrderBar(t_('ability_'+ab.id).split(':')[0]+': выберите цель');
+              Audio.sfx('click');
+            } else {
+              g.castAbility(hero,ab.id);self.renderActions(true);
+            }
+          }
+        },false,btnDisabled,tip,'ability');
+      })(abils[ai],ai);
+    }
+    this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
+      g.selectAllCombat();
+      self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
+    },false,false,'Выделить всех войск');
+    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  }
+  else if(sel.length){
+    var workers=[],fighters=[];
+    for(i=0;i<sel.length;i++){if(sel[i].role==='worker') workers.push(sel[i]);else fighters.push(sel[i]);}
+    if(workers.length){
+      var race=null;for(i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+      if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();});
+      this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
+        var assigned=0;
+        for(var wi=0;wi<workers.length;wi++){
+          var wk=workers[wi];
+          var mine=g.findVisibleResourceForWorker(wk,'gold',900);
+          if(mine){
+            wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
+            wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
+            wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
+            wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
+            wk._path=null;wk._pathIdx=0;
+            assigned++;
+          }
+        }
+        if(!assigned) g.notify(t_('noResNearby'));
+        else Audio.sfx('click');
+      });
+      this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
+        var assigned=0;
+        for(var wi=0;wi<workers.length;wi++){
+          var wk=workers[wi];
+          var tree=g.findVisibleResourceForWorker(wk,'tree',900);
+          if(tree){
+            wk.gatherTarget=tree;wk._assignedMine=null;wk.carrying=null;wk.carryAmt=0;
+            wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
+            wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
+            wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
+            wk._path=null;wk._pathIdx=0;
+            assigned++;
+          }
+        }
+        if(!assigned) g.notify(t_('noResNearby'));
+        else Audio.sfx('click');
+      });
+      var hasUnfinished=false;
+      for(i=0;i<g.buildings.length;i++){var bu=g.buildings[i];if(bu.pid===g.playerPid&&!bu.completed&&!bu.dead){hasUnfinished=true;break;}}
+      if(hasUnfinished){
+        this.addAction(box,toolIconImg('finishBuild'),t_('finishBuild'),null,function(){
+          var target=null,bd=Infinity;
+          for(var bi2=0;bi2<g.buildings.length;bi2++){var bb=g.buildings[bi2];if(bb.pid!==g.playerPid||bb.completed||bb.dead) continue;var d=(bb.x-workers[0].x)*(bb.x-workers[0].x)+(bb.y-workers[0].y)*(bb.y-workers[0].y);if(d<bd){bd=d;target=bb;}}
+          if(target){for(var wi=0;wi<workers.length;wi++){var wk=workers[wi];wk.buildTarget=target;wk.gatherTarget=null;wk.moveTo=null;wk.repairTarget=null;wk.demolishTarget=null;wk.carrying=null;wk.carryAmt=0;wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;wk._path=null;wk._pathIdx=0;}Audio.sfx('build');}
+        });
+      }
+      var damaged=null,damDist=Infinity;
+      for(i=0;i<g.buildings.length;i++){
+        var bd3=g.buildings[i];
+        if(bd3.pid!==g.playerPid||bd3.dead||!bd3.completed) continue;
+        if(bd3.hp>=bd3.maxHp) continue;
+        var dd3=(bd3.x-workers[0].x)*(bd3.x-workers[0].x)+(bd3.y-workers[0].y)*(bd3.y-workers[0].y);
+        if(dd3<damDist){damDist=dd3;damaged=bd3;}
+      }
+      if(damaged){
+        var repairTip=(t_('repairTooltip')||'Починить повреждённое здание')+'\n'+bldName(damaged.race,damaged.kind)+' — HP '+Math.ceil(damaged.hp)+'/'+damaged.maxHp;
+        this.addAction(box,toolIconImg('repair'),t_('repair')||'Ремонт',null,function(){
+          for(var wi2=0;wi2<workers.length;wi2++){
+            var wk3=workers[wi2];
+            wk3.repairTarget=damaged;wk3.buildTarget=null;wk3.gatherTarget=null;wk3.moveTo=null;
+            wk3.demolishTarget=null;wk3.target=null;wk3.lockedTarget=null;wk3._insideMine=false;wk3._mineSlot=-1;wk3._waitingForMine=false;wk3._path=null;wk3._pathIdx=0;
+          }
+          Audio.sfx('repair');
+        },false,false,repairTip);
+      }
+      this.addAction(box,toolIconImg('workers'),t_('workersAll'),null,function(){g.selectWorkers();});
+    }
+    if(fighters.length){
+      this.addAction(box,toolIconImg('attack'),'[A] A-move',null,function(){Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack');
+      this.addAction(box,toolIconImg('stop'),'[S] Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();});
+      this.addAction(box,toolIconImg('patrol'),'[P] Патруль',null,function(){Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol');
+      this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
+      this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
+      this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
+      var isHold=fighters[0].stance==='hold';
+      this.addAction(box,toolIconImg('hold'),(isHold?'✕ ':'')+t_('hold'),null,function(){
+        var newStance=isHold?'aggressive':'hold';
+        for(var wi=0;wi<fighters.length;wi++){
+          fighters[wi].stance=newStance;
+          if(newStance==='hold'){fighters[wi].originX=fighters[wi].x;fighters[wi].originY=fighters[wi].y;}
+        }
+        self.showHint((newStance==='hold'?'Держать вкл':'Держать выкл'),1);
+        self.renderActions(true);
+      },isHold,false,isHold?'Стойка: держать позицию (не преследовать)':'Стойка: агрессивная (преследовать врагов)');
+      this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
+        var th=null,bdT=Infinity;
+        for(var fi=0;fi<g.buildings.length;fi++){
+          var tb=g.buildings[fi];
+          if(tb.pid!==g.playerPid||tb.kind!=='townhall'||tb.dead) continue;
+          var dT=(tb.x-fighters[0].x)*(tb.x-fighters[0].x)+(tb.y-fighters[0].y)*(tb.y-fighters[0].y);
+          if(dT<bdT){bdT=dT;th=tb;}
+        }
+        if(!th) return;
+        for(var wi2=0;wi2<fighters.length;wi2++){
+          fighters[wi2].target=null;fighters[wi2].lockedTarget=null;
+          fighters[wi2].attackMoveTo=null;fighters[wi2].patrolRoute=null;
+          fighters[wi2].moveTo={x:th.x+(Math.random()-0.5)*60,y:th.y+(Math.random()-0.5)*60};
+          fighters[wi2]._path=null;fighters[wi2]._pathIdx=0;
+        }
+        self.showHint('Отступление',1.2);
+      });
+      this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
+        g.selectAllCombat();
+        self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
+      },false,false,'Выделить всех войск');
+    }
+    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  }
+  if(selB.length){
+    var b2=selB[0];
+    if(!b2.completed){var div=document.createElement('div');div.style.cssText='color:#a8c5d6;font-size:11px;padding:8px;text-align:center;grid-column:1/-1';div.textContent=Math.floor((b2.buildProgress/b2.buildTime)*100)+'%';box.appendChild(div);}
+    if(b2.completed&&b2.kind==='townhall'){
+      var lvl=b2.level||1;
+      var thBusyTrain=(b2.queue&&b2.queue.length>0);
+      if(lvl<3&&!b2.upgrading){
+        var cost=TH_UPG[lvl],res=g.getRes(g.playerPid);
+        var can=(res.gold>=cost.gold&&res.wood>=cost.wood)&&!thBusyTrain;
+        var thTip=thBusyTrain?'Нельзя улучшать, пока идёт найм рабочих':'Улучшить до ур.'+(lvl+1);
+        this.addAction(box,toolIconImg('upgrade'),t_('upgrade')+' '+lvl+'→'+(lvl+1),self.costStr(cost.gold,cost.wood),function(){self.upgradeTH(b2);},false,!can,thTip);
+      }
+      var wdef=RACES[b2.race].units.worker;
+      var wprice=self.costStr(wdef.gold,wdef.wood)+self.foodStr('worker');
+      var wtip=uName(b2.race,'worker')+'\nHP '+wdef.hp+' · Урон '+wdef.dmg+' · Дальность '+wdef.range+' · Скорость '+wdef.spd+'\nЗолото: '+wdef.gold+' · Еда: '+(FOOD_COST.worker||1)+'\nВремя: '+wdef.time+'с\n'+t_('u_worker_desc');
+      var trainBlocked=!!b2.upgrading;
+      this.addAction(box,unitIconImg(b2.race,'worker'),uName(b2.race,'worker'),wprice,function(){self.queueUnit(b2,'worker');},false,trainBlocked,trainBlocked?'Идёт улучшение ратуши':wtip);
+    } else if(b2.completed){
+      var thLvl=g.getTHLevel(g.playerPid),roles=[];
+      var keys=Object.keys(UNIT_UNLOCK);
+      for(i=0;i<keys.length;i++){var r=keys[i],cfg=UNIT_UNLOCK[r];if(cfg.b!==b2.kind) continue;if(cfg.th>thLvl) continue;roles.push(r);}
+      if(b2.kind==='forge'){
+        var busyForge=b2.techUpgrading;
+        if(!busyForge && roles.length>0){
+          var hireHdr=document.createElement('div');
+          hireHdr.className='section-sep';
+          hireHdr.textContent=t_('hireUnits');
+          box.appendChild(hireHdr);
+          for(i=0;i<roles.length;i++){
+            (function(rr){
+              var def=RACES[b2.race].units[rr];if(!def) return;
+              var priceU=self.costStr(def.gold,def.wood)+self.foodStr(rr);
+              var tipU=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU,function(){self.queueUnit(b2,rr);},false,false,tipU);
+            })(roles[i]);
+          }
+        }
+        var upHdr=document.createElement('div');
+        upHdr.className='section-sep';
+        upHdr.textContent=t_('techUpgrades');
+        box.appendChild(upHdr);
+        var roleIcons={melee:'weapon_melee',ranged:'weapon_ranged',spear:'weapon_spear',cav:'weapon_cav',elite:'weapon_elite'};
+        var armorIcons={melee:'armor_melee',ranged:'armor_ranged',spear:'armor_spear',cav:'armor_cav',elite:'armor_elite'};
+        for(var ui2=0;ui2<UPGRADE_ROLES.length;ui2++){
+          (function(role){
+            var up=g.getUnitUpgrades(g.playerPid,role),rdef=RACES[b2.race].units[role];if(!rdef) return;
+            var rName=uName(b2.race,role);
+            var res2=g.getRes(g.playerPid);
+            if(up.w<3){
+              var cw=UPGRADE_COST[up.w];
+              var canW=res2.gold>=cw.gold && res2.wood>=cw.wood && !busyForge;
+              var curW=up.w*15,nextW=(up.w+1)*15;
+              var tipW=t_('wUpgTip').replace('{cur}',curW).replace('{next}',nextW).replace('{roles}',rName);
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' '+up.w+'→'+(up.w+1),self.costStr(cw.gold,cw.wood),function(){self.startForgeUpgrade(b2,role,'w');},false,!canW,tipW);
+            } else {
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — максимально прокачано.');
+            }
+            if(up.a<3){
+              var ca=UPGRADE_COST[up.a];
+              var canA=res2.gold>=ca.gold && res2.wood>=ca.wood && !busyForge;
+              var curA=up.a*8,nextA=(up.a+1)*8;
+              var tipA=t_('aUpgTip').replace('{cur}',curA).replace('{next}',nextA).replace('{roles}',rName);
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' '+up.a+'→'+(up.a+1),self.costStr(ca.gold,ca.wood),function(){self.startForgeUpgrade(b2,role,'a');},false,!canA,tipA);
+            } else {
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — броня максимальна.');
+            }
+          })(UPGRADE_ROLES[ui2]);
+        }
+        if(busyForge){
+          var busyDiv=document.createElement('div');
+          busyDiv.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center';
+          var pctF=Math.max(0,Math.min(100,Math.round((1-busyForge.timeLeft/busyForge.timeTotal)*100)));
+          busyDiv.textContent=t_('upgradingFor')+' '+uName(b2.race,busyForge.role)+' — '+pctF+'%';
+          box.appendChild(busyDiv);
+        }
+      } else {
+        var aliveHero=0;
+        for(var hhi=0;hhi<g.units.length;hhi++){var hu2=g.units[hhi];if(hu2.isHero&&hu2.pid===g.playerPid&&!hu2.dying) aliveHero++;}
+        var dh2=g.deadHeroes?g.deadHeroes[g.playerPid]:null;
+        for(i=0;i<roles.length;i++){
+          (function(rr){
+            var def=RACES[b2.race].units[rr];if(!def) return;
+            if(rr==='hero'){
+              if(aliveHero>=1) return;
+              var heroInQueue2=false;
+              for(var hq2=0;hq2<g.buildings.length;hq2++){
+                var hqb2=g.buildings[hq2];
+                if(hqb2.pid!==g.playerPid||hqb2.dead) continue;
+                for(var qqi2=0;qqi2<hqb2.queue.length;qqi2++){if(hqb2.queue[qqi2].role==='hero'){heroInQueue2=true;break;}}
+                if(hqb2.reviveQueue&&hqb2.reviveQueue.length>0) heroInQueue2=true;
+                if(heroInQueue2) break;
+              }
+              if(heroInQueue2) return;
+              if(dh2&&b2.kind==='altar'){
+                var hd=RACES[dh2.race].units.hero;
+                var res3=g.getRes(g.playerPid);
+                var canR=res3.gold>=hd.gold&&res3.wood>=hd.wood;
+                var tipR='Воскресить героя Ур.'+dh2.level+'\nВремя: '+(25+2*(dh2.level||1))+'с';
+                var priceR=self.costStr(hd.gold,hd.wood)+self.foodStr('hero');
+                self.addAction(box,unitIconImg(dh2.race,'hero'),t_('resurrect')+' Ур.'+dh2.level,priceR,function(){self.resurrectHero(b2);},false,!canR,tipR);
+                return;
+              }
+              var priceH=self.costStr(def.gold,def.wood)+self.foodStr('hero');
+              var tipH=uName(b2.race,'hero')+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST.hero||1)+'\n'+t_('u_hero_desc');
+              self.addAction(box,unitIconImg(b2.race,'hero'),uName(b2.race,'hero'),priceH,function(){self.queueUnit(b2,'hero');},false,false,tipH);
+            } else {
+              var priceU2=self.costStr(def.gold,def.wood)+self.foodStr(rr);
+              var tipU2=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU2,function(){self.queueUnit(b2,rr);},false,false,tipU2);
+            }
+          })(roles[i]);
+        }
+      }
+    }
+    if(b2.queue.length>0) this.addAction(box,toolIconImg('deselect'),t_('cancel'),b2.queue.length+'',function(){var qr=b2.queue.shift();if(qr){var rd=RACES[qr.race],qd=rd&&rd.units[qr.role];if(qd) g.addRes(g.playerPid,qd.gold||0,qd.wood||0);}self.renderActions(true);});
+    if(b2.kind==='tower'&&b2.completed){
+      if(b2._towerUpgrading){
+        var tuPct=Math.max(0,Math.min(100,Math.round((1-b2._towerUpgradeTimeLeft/b2._towerUpgradeTotal)*100)));
+        var tuDivP=document.createElement('div');
+        tuDivP.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center';
+        tuDivP.textContent='Улучшение: '+tuPct+'% ('+towerUpgradeName(b2._pendingUpgrade)+')';
+        box.appendChild(tuDivP);
+      } else if(b2.towerUpgrade){
+        var tuInfo=TOWER_UPGRADES[b2.race]&&TOWER_UPGRADES[b2.race][b2.towerUpgrade];
+        var tuName=tuInfo?(LC==='en'?tuInfo.nameEn:tuInfo.name):b2.towerUpgrade;
+        var tuDiv=document.createElement('div');
+        tuDiv.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center;border-top:1px solid #3d4c68;margin-top:4px';
+        tuDiv.textContent='Улучшение: '+tuName;
+        box.appendChild(tuDiv);
+      } else if(towerCanUpgrade(b2)){
+        var opts=TOWER_UPGRADES[b2.race]||{};
+        var upgHdr=document.createElement('div');
+        upgHdr.className='section-sep';upgHdr.textContent='Улучшение башни (1 из 2, навсегда)';
+        box.appendChild(upgHdr);
+        var towerIconMap={holy_arrows:'weapon_ranged',holy_cannon:'attack',blood_totem:'bloodthirst',fire_totem:'rage',poison_spikes:'entangle',moon_beam:'moonfire'};
+        for(var upKey in opts){
+          (function(uk,udef){
+            var resU=g.getRes(g.playerPid);
+            var canU=resU.gold>=udef.cost.gold&&resU.wood>=udef.cost.wood;
+            var nameU=LC==='en'?udef.nameEn:udef.name;
+            var statsTxt='Урон: '+udef.atk+' / '+udef.atkCd+'с\nДальность: '+udef.rng+'\nРемонт: +'+udef.hpBonus+' HP (одноразово)';
+            if(udef.burnDmg) statsTxt+='\nПоджог: '+udef.burnDmg+'/сек × '+udef.burnDur+'с';
+            if(udef.aoe) statsTxt+='\nAoE: '+udef.aoe+' px ('+Math.round(udef.aoeEdge*100)+'% по краю)';
+            if(udef.healAmt) statsTxt+='\nЛечит '+udef.healAmt+' HP слабейшему союзнику в '+udef.healR+' px';
+            if(udef.cone) statsTxt+='\nКонус: '+udef.cone+'°';
+            if(udef.poisonDmg) statsTxt+='\nЯд: '+udef.poisonDmg+'/сек × '+udef.poisonDur+'с (до '+udef.maxStacks+' стаков)';
+            if(udef.ignoreArmor) statsTxt+='\nИгнорирует броню';
+            self.addAction(box,toolIconImg(towerIconMap[uk]||'upgrade'),nameU,self.costStr(udef.cost.gold,udef.cost.wood),function(){
+              if(b2._towerUpgrading||b2.towerUpgrade||b2._pendingUpgrade){g.notify('Башня уже улучшается');return;}
+              var r2=g.getRes(g.playerPid);
+              if(r2.gold<udef.cost.gold||r2.wood<udef.cost.wood){g.notify(t_('nGold'));return;}
+              g.subRes(g.playerPid,udef.cost.gold,udef.cost.wood);
+              b2._pendingUpgrade=uk;
+              b2._towerUpgrading=true;
+              b2._towerUpgradeTimeLeft=udef.time;
+              b2._towerUpgradeTotal=udef.time;
+              Audio.sfx('upgrade',b2.x,b2.y);
+              self.renderActions(true);
+            },false,!canU,nameU+'\n'+statsTxt+'\n\nВремя: '+udef.time+'с');
+          })(upKey,opts[upKey]);
+        }
+      }
+    }
+    if(b2.kind==='lumber'&&b2.completed){
+      var lvlS=b2.sawmillLevel||0;
+      if(lvlS>=3){
+        this.addAction(box,toolIconImg('upgrade'),'Лесопилка MAX','',function(){},false,true,'Лесопилка максимально улучшена');
+      } else if(b2.sawmillUpgrading){
+        var pctS=Math.round((1-b2.sawmillUpgradeTimeLeft/b2.sawmillUpgradeTotal)*100);
+        this.addAction(box,toolIconImg('upgrade'),'Улучшение '+pctS+'%','',function(){},false,true,'Улучшение лесопилки в процессе');
+      } else {
+        var costS=SAWMILL_UPG[lvlS];
+        var resS=g.getRes(g.playerPid);
+        var canS=resS.gold>=costS.gold&&resS.wood>=costS.wood;
+        var bonusPct=Math.round(costS.hpBonus*100);
+        var tipS='Улучшить лесопилку до ур.'+(lvlS+1)+'\nВсем зданиям владельца +'+bonusPct+'% HP\n(Не складывается с другими лесопилками)\nВремя: '+costS.time+'с';
+        this.addAction(box,toolIconImg('upgrade'),'Улучшить лесопилку→'+(lvlS+1),self.costStr(costS.gold,costS.wood),function(){
+          var resS2=g.getRes(g.playerPid);
+          if(resS2.gold<costS.gold||resS2.wood<costS.wood){g.notify(t_('nGold'));return;}
+          g.subRes(g.playerPid,costS.gold,costS.wood);
+          b2.sawmillUpgrading=true;
+          b2.sawmillUpgradeTimeLeft=costS.time;
+          b2.sawmillUpgradeTotal=costS.time;
+          Audio.sfx('sawmill_upgrade',b2.x,b2.y);
+          self.renderActions(true);
+        },false,!canS,tipS);
+      }
+    }
+    if(b2.kind!=='townhall'){
+      if(!b2.completed){
+        var cancelTip='Отменить постройку. Вернёт полную стоимость ('+b2.costGold+'+'+b2.costWood+'), рабочий освободится.';
+        this.addAction(box,toolIconImg('deselect'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip);
+      } else {
+        this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);});
+      }
+    }
+    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  }
+};
+
+  <!-- ===== ЧАСТЬ 15u/15 (ФИНАЛ) ===== -->
+UISys.prototype.update=function(){
+  var g=Game_;if(!g) return;
+  try{
+    var res=g.getRes(g.playerPid);
+    this.$('h-gold').textContent=Math.floor(res.gold);
+    this.$('h-wood').textContent=Math.floor(res.wood);
+    var popText=res.food+'/'+res.maxFood;
+    if(res.maxFood>=MAX_FOOD) popText+=' (макс)';
+    this.$('h-pop').textContent=popText;
+    var mm=Math.floor(g.time/60),ss=Math.floor(g.time%60);
+    this.$('h-time').textContent=(mm<10?'0':'')+mm+':'+(ss<10?'0':'')+ss;
+    while(g.notifications.length){var n=g.notifications.shift();this.pushNotif(n.text);}
+    var box=this.$('actions');
+    if(box.dataset.menu!=='build'&&box.dataset.menu!=='placing'){
+      var hash=this.getActionsHash();
+      if(hash!==this._lastActionsHash){this._lastActionsHash=hash;this.renderActions(true);}
+    }
+    this.updateQueuePanel();
+    this._mmTimer=(this._mmTimer||0)+1;
+    if(this._mmTimer>=2){this._mmTimer=0;this.drawMinimap();}
+    this._infoTimer=(this._infoTimer||0)+1;
+    if(this._infoTimer>=3){this._infoTimer=0;this.refreshInfoOnly();this._refreshPortraitBars();}
+    if(g.gameOver&&!this._gameOverShown){
+      this._gameOverShown=true;
+      var self=this;
+      setTimeout(function(){
+        var go=self.$('gameover');
+        self.$('go-title').textContent=g.result==='win'?t_('victory'):t_('defeat');
+        self.$('go-sub').textContent=g.result==='win'?t_('vsub'):t_('dsub');
+        self._goTab='players';
+        var tabs=document.querySelectorAll('.go-tab');
+        for(var _ti=0;_ti<tabs.length;_ti++){tabs[_ti].classList.toggle('active',tabs[_ti].dataset.tab==='players');}
+        self.renderGameOverStats();
+        go.classList.add('active');
+        Audio.sfx(g.result==='win'?'victory':'defeat');
+      },1200);
+      g.shake=2;
+    }
+  }catch(e){ERR('UI.update',e);}
+};
+UISys.prototype.updateQueuePanel=function(){
+  if(!Game_) return;
+  var g=Game_,selB=[];
+  for(var i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.sel&&b.pid===g.playerPid&&(b.queue.length>0||(b.reviveQueue&&b.reviveQueue.length>0))) selB.push(b);}
+  var panel=this.$('queue-panel'),list=this.$('queue-list');
+  if(!selB.length){panel.classList.remove('show');return;}
+  panel.classList.add('show');
+  var b=selB[0];
+  var qHash='';
+  for(var _qi=0;_qi<b.queue.length;_qi++) qHash+=b.queue[_qi].role.charAt(0)+b.queue[_qi].race.charAt(0)+'|';
+  if(b.reviveQueue&&b.reviveQueue.length) qHash+='REV'+Math.floor(b.reviveQueue[0].timeLeft);
+  if(list.dataset.qhash!==qHash){
+    list.dataset.qhash=qHash;
+    list.innerHTML='';
+    if(b.reviveQueue&&b.reviveQueue.length>0){
+      var rq=b.reviveQueue[0];
+      var itemR=document.createElement('div');itemR.className='q-item';
+      var nmR=document.createElement('div');nmR.className='q-name';
+      nmR.style.display='flex';nmR.style.alignItems='center';nmR.style.gap='4px';
+      nmR.innerHTML=unitIconImg(b.race,'hero')+'<span>Воскрешение Ур.'+(rq.reviveData?rq.reviveData.level:'')+'</span>';
+      var barR=document.createElement('div');barR.className='q-bar-bg';
+      var fillR=document.createElement('div');fillR.className='q-bar-fill';fillR.style.width='0%';
+      barR.appendChild(fillR);
+      var wrapR=document.createElement('div');wrapR.style.flex='1';wrapR.appendChild(nmR);wrapR.appendChild(barR);
+      itemR.appendChild(wrapR);
+      var tmR=document.createElement('div');tmR.className='q-time';tmR.textContent=Math.ceil(rq.timeLeft)+'с';
+      itemR.appendChild(tmR);
+      list.appendChild(itemR);
+    }
+    for(var qi=0;qi<b.queue.length;qi++){
+      var q=b.queue[qi];
+      var item=document.createElement('div');item.className='q-item';
+      var nm=document.createElement('div');nm.className='q-name';
+      nm.style.display='flex';nm.style.alignItems='center';nm.style.gap='4px';
+      nm.innerHTML=unitIconImg(b.race,q.role)+'<span>'+(q.role==='hero'?uName(b.race,'hero'):uName(b.race,q.role))+'</span>';
+      var bar=document.createElement('div');bar.className='q-bar-bg';
+      var fill=document.createElement('div');fill.className='q-bar-fill';fill.style.width='0%';
+      bar.appendChild(fill);
+      var wrap=document.createElement('div');wrap.style.flex='1';wrap.appendChild(nm);wrap.appendChild(bar);
+      item.appendChild(wrap);
+      var tm=document.createElement('div');tm.className='q-time';tm.textContent=Math.ceil(q.timeLeft)+'с';
+      item.appendChild(tm);
+      list.appendChild(item);
+    }
+  }
+  var items=list.children;
+  var offset=(b.reviveQueue&&b.reviveQueue.length)?1:0;
+  if(offset&&items[0]){
+    var rq2=b.reviveQueue[0];
+    var fillElR=items[0].querySelector('.q-bar-fill');
+    if(fillElR){var pctR=Math.max(0,Math.min(100,(1-rq2.timeLeft/rq2.timeTotal)*100));fillElR.style.width=pctR+'%';}
+    var tmElR=items[0].querySelector('.q-time');
+    if(tmElR) tmElR.textContent=Math.max(0,Math.ceil(rq2.timeLeft))+'с';
+  }
+  for(var qi2=0;qi2<b.queue.length;qi2++){
+    var q2=b.queue[qi2],it=items[qi2+offset];
+    if(!it) continue;
+    var fillEl=it.querySelector('.q-bar-fill');
+    if(fillEl){var pct=Math.max(0,Math.min(100,(1-q2.timeLeft/q2.timeTotal)*100));fillEl.style.width=pct+'%';}
+    var tmEl=it.querySelector('.q-time');
+    if(tmEl) tmEl.textContent=Math.max(0,Math.ceil(q2.timeLeft))+'с';
+  }
+};
+UISys.prototype.pushNotif=function(text){
+  var el=document.createElement('div');el.className='notif';el.textContent=text;
+  this.$('notifications').appendChild(el);
+  setTimeout(function(){if(el.parentNode) el.parentNode.removeChild(el);},3200);
+};
+UISys.prototype.drawMinimap=function(){
+  var g=Game_;if(!g||!Renderer_) return;
+  var cv=this.$('minimap'),ctx=cv.getContext('2d');
+  var W=cv.width,H=cv.height,sx=W/g.W,sy=H/g.H;
+  ctx.fillStyle='#1a2a1a';ctx.fillRect(0,0,W,H);
+  var cs=g.fogCellSize,i,j;
+  for(i=0;i<g.fogCols;i++) for(j=0;j<g.fogRows;j++){var f=g.fog[i+j*g.fogCols];if(f===2) continue;ctx.fillStyle=f===1?'rgba(0,0,0,0.55)':'rgba(0,0,0,0.92)';ctx.fillRect(i*cs*sx,j*cs*sy,cs*sx+0.5,cs*sy+0.5);}
+  for(i=0;i<g.resources.length;i++){var r=g.resources[i];if(r.dead||!g.isExplored(r.x,r.y)) continue;ctx.fillStyle=r.kind==='gold'?'#ffe066':'#2d5a2d';var sz=r.kind==='gold'?5:3;ctx.fillRect(r.x*sx-sz/2,r.y*sy-sz/2,sz,sz);}
+  for(i=0;i<g.creeps.length;i++){var c=g.creeps[i];if(c.dead||!g.isExplored(c.x,c.y)) continue;ctx.fillStyle=c.isBoss?'#ff6060':'#8a3030';ctx.fillRect(c.x*sx-2,c.y*sy-2,4,4);}
+  for(i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.dead) continue;
+    var visB=(b.pid===g.playerPid)||(b.team===g.playerTeam)||g.isVisible(b.x,b.y);
+    if(!visB) continue;
+    ctx.fillStyle=b.completed?teamColor(b.team):'#a08040';ctx.fillRect(b.x*sx-3,b.y*sy-3,6,6);}
+  for(i=0;i<g.units.length;i++){var u=g.units[i];if(u.dead||u.dying) continue;
+    var visU=(u.pid===g.playerPid)||(u.team===g.playerTeam)||g.isVisible(u.x,u.y);
+    if(!visU) continue;
+    ctx.fillStyle=u.isHero?'#ffe9a8':teamColor(u.team);var s2=u.isHero?5:3;ctx.fillRect(u.x*sx-s2/2,u.y*sy-s2/2,s2,s2);}
+  var cam=g.camera,vx=(cam.x-Renderer_.w/2/cam.zoom)*sx,vy=(cam.y-Renderer_.h/2/cam.zoom)*sy,vw=Renderer_.w/cam.zoom*sx,vh=Renderer_.h/cam.zoom*sy;
+  ctx.strokeStyle='#e6c67a';ctx.lineWidth=2;ctx.strokeRect(vx,vy,vw,vh);
+};
+UISys.prototype.updateWorldTip=function(){
+  var tip=this.$('world-tip');
+  if(!tip||!Game_||!Renderer_) return;
+  var show=this._mobileTip;
+  if(!show){tip.classList.remove('show');return;}
+  var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
+  var ent=pick.unit||pick.creep||pick.building||pick.resource;
+  if(!ent){tip.classList.remove('show');return;}
+  tip.classList.add('show');
+  var tt='';
+  if(pick.unit){
+    var u=pick.unit;
+    var name=u.isHero?('⭐ '+uName(u.race,'hero')):uName(u.race,u.role);
+    tt='<div class="tt-name">'+name+(u.isHero?' Ур.'+u.level:'')+' ('+t_('team')+(u.team+1)+')</div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(u.hp)+'/'+u.maxHp+'</span></div>';
+    if(u.isHero||u.isHealer) tt+='<div class="tt-row"><span>'+t_('mana')+'</span><span>'+Math.floor(u.mana||0)+'/'+(u.maxMana||100)+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+u.dmg+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+u.range+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_spd')+'</span><span>'+u.spd+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>'+(FOOD_COST[u.role]||1)+'</span></div>';
+    if(u.owner==='bot') tt+='<div class="tt-row"><span>Владелец</span><span>'+t_('bot')+'</span></div>';
+    var dk='u_'+u.role+'_desc';
+    var desc=t_(dk);
+    if(desc&&desc!==dk) tt+='<div class="tt-desc">'+desc+'</div>';
+  } else if(pick.creep){
+    var cc=pick.creep;
+    var creepName=cc.kind==='wolf'?'Волк':cc.kind==='bear'?'Медведь':cc.kind==='boar'?'Кабан':cc.kind==='spider'?'Паук':'Бандит';
+    tt='<div class="tt-name">'+creepName+' Lv.'+cc.level+(cc.isBoss?' BOSS':'')+'</div>';
+    tt+='<div class="tt-row"><span>HP</span><span>'+Math.ceil(cc.hp)+'/'+cc.maxHp+'</span></div>';
+    tt+='<div class="tt-row"><span>Урон</span><span>'+cc.dmg+'</span></div>';
+    tt+='<div class="tt-row"><span>Броня</span><span>'+cc.armor.toFixed(2)+'</span></div>';
+    tt+='<div class="tt-row"><span>Награда</span><span>'+cc.goldReward+'</span></div>';
+  } else if(pick.building){
+    var b=pick.building;
+    var towerUpTag='';
+    if(b.kind==='tower'&&b.towerUpgrade) towerUpTag=' ('+towerUpgradeName(b.towerUpgrade)+')';
+    tt='<div class="tt-name">'+bldName(b.race,b.kind)+towerUpTag+(b.completed?' Ур.'+b.level:' '+Math.floor((b.buildProgress/b.buildTime)*100)+'%')+'</div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(b.hp)+'/'+b.maxHp+'</span></div>';
+    if(b.atk) tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+b.atk+'</span></div>';
+    if(b.rng) tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+b.rng+'</span></div>';
+    if(b.kind==='house') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+8</span></div>';
+    if(b.kind==='townhall') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+16</span></div>';
+    if(b.kind==='lumber'&&(b.sawmillLevel||0)>0) tt+='<div class="tt-row"><span>Уровень</span><span>'+b.sawmillLevel+'</span></div>';
+    if(b.techUpgrading) tt+='<div class="tt-row"><span>Прокачка</span><span>'+uName(b.race,b.techUpgrading.role)+'</span></div>';
+    var descKey='d_'+b.kind;
+    var descB=t_(descKey);
+    if(descB&&descB!==descKey) tt+='<div class="tt-desc">'+descB+'</div>';
+  } else if(pick.resource){
+    var r=pick.resource;
+    tt='<div class="tt-name">'+(r.kind==='gold'?t_('goldMine'):t_('treeRes'))+'</div>';
+    tt+='<div class="tt-row"><span>'+t_('remaining')+'</span><span>'+Math.floor(r.amount)+'</span></div>';
+    if(r.kind==='gold') tt+='<div class="tt-desc">'+t_('d_gold')+'</div>';
+    else tt+='<div class="tt-desc">'+t_('d_tree')+'</div>';
+  }
+  tip.innerHTML=tt;
+  var tx=Input.mouseX+16,ty=Input.mouseY+16;
+  if(tx+280>Renderer_.w) tx=Input.mouseX-282;
+  if(ty+140>Renderer_.h) ty=Input.mouseY-140;
+  tip.style.left=tx+'px';tip.style.top=ty+'px';
+};
+UISys.prototype.renderGameOverStats=function(){
+  if(!Game_) return;
+  var box=this.$('go-stats');if(!box) return;
+  var g=Game_,tab=this._goTab||'players';
+  var isMobile=Settings._isMobile || window.innerWidth<600;
+  if(isMobile){
+    var html='<div style="display:flex;flex-direction:column;gap:8px">';
+    function statCard(name,color,st){
+      var c=color||'#e8e8e8';
+      return '<div style="background:#0d1420;border:1px solid #3d4c68;border-radius:6px;padding:8px 10px;border-left:4px solid '+c+'">'
+        +'<div style="color:'+c+';font-weight:800;font-size:13px;margin-bottom:6px">'+name+'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:11px">'
+        +'<div><span style="color:#9ab">Золото:</span> <span style="color:#ffe9a8">'+(st.goldMined|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Дерево:</span> <span style="color:#c8a878">'+(st.woodMined|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Создано:</span> <span style="color:#a0ffa0">'+(st.unitsCreated|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Убито:</span> <span style="color:#ff8060">'+(st.enemiesKilled|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Крипов:</span> <span style="color:#ffd060">'+(st.creepsKilled|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Потери:</span> <span style="color:#ff6060">'+(st.unitsLost|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Зд. потеряно:</span> <span style="color:#ff6060">'+(st.buildingsLost|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Зд. разрушено:</span> <span style="color:#a0ffa0">'+(st.buildingsDestroyed|0)+'</span></div>'
+        +'</div></div>';
+    }
+    if(tab==='players'){
+      for(var i=0;i<g.config.slots.length;i++){
+        var s=g.config.slots[i];
+        if(s.type==='empty') continue;
+        var st=g.stats[i]||{};
+        var label=(s.type==='player'?t_('player'):t_('bot'))+' · '+t_(s.race)+' (T'+(s.team+1)+')';
+        html+=statCard(label,teamColor(s.team),st);
+      }
+    } else if(tab==='teams'){
+      var teams={};
+      for(var i2=0;i2<g.config.slots.length;i2++){
+        var s2=g.config.slots[i2];
+        if(s2.type==='empty') continue;
+        if(!teams[s2.team]) teams[s2.team]={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0,members:[]};
+        var tt=teams[s2.team],st2=g.stats[i2]||{};
+        for(var f in tt){if(typeof tt[f]==='number') tt[f]+=st2[f]||0;}
+        tt.members.push((s2.type==='player'?t_('player'):t_('bot'))+'·'+t_(s2.race));
+      }
+      for(var tk in teams){
+        var tt2=teams[tk];
+        html+=statCard('Команда '+(parseInt(tk)+1)+'<div style="font-size:10px;color:#9ab;font-weight:400">'+tt2.members.join(', ')+'</div>',teamColor(parseInt(tk)),tt2);
+      }
+    } else {
+      var sum={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0};
+      for(var k2 in g.stats){var st3=g.stats[k2];for(var f2 in sum) sum[f2]+=st3[f2]||0;}
+      html+=statCard('ВСЕГО','#ffe9a8',sum);
+      var pst=g.stats[g.playerPid]||{};
+      html+=statCard('Вы','#e6c67a',pst);
+    }
+    html+='</div>';
+    box.innerHTML=html;
+    return;
+  }
+  var rows='';
+  function statRow(name,color,st){
+    return '<tr><td style="color:'+(color||'#e8e8e8')+';font-weight:700">'+name+'</td><td>'+(st.goldMined|0)+'</td><td>'+(st.woodMined|0)+'</td><td>'+(st.unitsCreated|0)+'</td><td>'+(st.enemiesKilled|0)+'</td><td>'+(st.creepsKilled|0)+'</td><td>'+(st.unitsLost|0)+'</td><td>'+(st.buildingsLost|0)+'</td><td>'+(st.buildingsDestroyed|0)+'</td></tr>';
+  }
+  var header='<table><thead><tr><th>Участник</th><th>Зол.</th><th>Дер.</th><th>Созд.</th><th>Уб.в.</th><th>Крипы</th><th>Потери</th><th>Зд.п.</th><th>Зд.р.</th></tr></thead><tbody>';
+  if(tab==='players'){
+    for(var i3=0;i3<g.config.slots.length;i3++){
+      var s3=g.config.slots[i3];
+      if(s3.type==='empty') continue;
+      var st3b=g.stats[i3]||{};
+      var label3=(s3.type==='player'?t_('player'):t_('bot'))+' · '+t_(s3.race)+' (T'+(s3.team+1)+')';
+      rows+=statRow(label3,teamColor(s3.team),st3b);
+    }
+  } else if(tab==='teams'){
+    var teams2={};
+    for(var i4=0;i4<g.config.slots.length;i4++){
+      var s4=g.config.slots[i4];
+      if(s4.type==='empty') continue;
+      if(!teams2[s4.team]) teams2[s4.team]={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0,members:[]};
+      var tt3=teams2[s4.team],st4=g.stats[i4]||{};
+      for(var f3 in tt3){if(typeof tt3[f3]==='number') tt3[f3]+=st4[f3]||0;}
+      tt3.members.push((s4.type==='player'?t_('player'):t_('bot'))+'·'+t_(s4.race));
+    }
+    for(var tk2 in teams2){
+      var tt4=teams2[tk2];
+      rows+=statRow('Команда '+(parseInt(tk2)+1)+': '+tt4.members.join(', '),teamColor(parseInt(tk2)),tt4);
+    }
+  } else {
+    var sum2={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0};
+    for(var k3 in g.stats){var st5=g.stats[k3];for(var f4 in sum2) sum2[f4]+=st5[f4]||0;}
+    rows+=statRow('ВСЕГО','#ffe9a8',sum2);
+    var pst2=g.stats[g.playerPid]||{};
+    rows+=statRow('Вы','#e6c67a',pst2);
+  }
+  box.innerHTML=header+rows+'</tbody></table>';
+};
+var _lastUpdateTime=0;
+function loop(now){
+  if(!lastT) lastT=now;
+  var dt=(now-lastT)/1000;
+  if(!isFinite(dt)||dt<0) dt=0.016;
+  dt=Math.min(0.1,dt);
+  lastT=now;
+  try{
+    if(Game_&&!Game_.paused){
+      Input.updateCamera(dt);
+      Game_.update(dt);
+      _lastUpdateTime=now;
+      if(Game_.camera) Audio.setEar(Game_.camera.x,Game_.camera.y,Game_.camera.zoom);
+    }
+  }catch(e){ERR('update',e);}
+  try{
+    if(Renderer_&&Game_){
+      if(Renderer_.setFrameAlpha) Renderer_.setFrameAlpha(0.5);
+      Renderer_.draw();
+    }
+  }catch(e){ERR('draw',e);}
+  try{if(Game_&&UI) UI.update();}catch(e){ERR('UI',e);}
+  try{if(Game_&&UI) UI.updateWorldTip();}catch(e){ERR('tip',e);}
+  requestAnimationFrame(loop);
+}
+function boot(){
+  try{
+    UI=new UISys();
+    UI.applyLangUI();
+    Input.init(document.getElementById('game'));
+    document.addEventListener('visibilitychange',function(){
+      if(document.hidden){Audio.pauseAll();}
+      else{Audio.resume();lastT=0;}
+    });
+    window.addEventListener('blur',function(){Audio.pauseAll();});
+    window.addEventListener('focus',function(){Audio.resume();lastT=0;});
+    UI.showScreen('menu');
+    requestAnimationFrame(loop);
+  }catch(e){ERR('boot',e);showError('Load: '+e.message);}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+else boot();
+</script>
+</body>
+</html>
+<!-- ===== КОНЕЦ ЧАСТИ 15u/15 (ФИНАЛ) ===== -->
+<!-- ===== КОНЕЦ ВСЕГО ФАЙЛА v51.0.0 ===== -->
