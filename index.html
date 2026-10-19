@@ -4694,12 +4694,17 @@ Game.prototype.updateUnit=function(u,dt){
       u._lastStuckX=u.x;u._lastStuckY=u.y;
     }
   }
+
+  
   if(u.dying){u.deathT+=dt;if(u.deathT>1.6){u.dead=true;if(!u._isSummon)this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));}return;}
-    u.dying=true;u.deathT=0;u.deathDir=(u.dir===DIR.LEFT)?-1:1;
-    /* === PATCH 9: суммоны не считаются потерями и не оставляют следов === */
-    if(u._isSummon){
-      return;
-    }
+if(u.hp<=0){
+  u.dying=true;u.deathT=0;u.deathDir=(u.dir===DIR.LEFT)?-1:1;
+  /* === PATCH 9: суммоны не считаются потерями и не оставляют следов === */
+  if(u._isSummon){
+    return;
+  }
+
+  
     this.spawnParticles(u.x,u.y,'#8a1010',10);
     if(this.stats[u.pid]) this.stats[u.pid].unitsLost++;
     var _la=u.lastAttacker;
