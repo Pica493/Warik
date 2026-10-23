@@ -5073,15 +5073,10 @@ function toolIconURL(kind,size){
     ctx.beginPath();ctx.moveTo(11,18);ctx.lineTo(13,24);ctx.lineTo(14,18);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(18,18);ctx.lineTo(19,24);ctx.lineTo(21,18);ctx.closePath();ctx.fill();
     ctx.strokeStyle='#3a2010';ctx.lineWidth=0.7;ctx.stroke();
-  } else {
-    ctx.fillStyle='#666';ctx.beginPath();ctx.arc(16,16,12,0,TAU);ctx.fill();
-    ctx.strokeStyle='#222';ctx.lineWidth=1.5;ctx.stroke();
-  }
-  var url=c.toDataURL();TOOL_ICONS[cacheKey]=url;return url;
-}
-
-    } else if(kind==='spirits'){
-    /* PATCH 5a: три призрака */
+ 
+  
+  } else if(kind==='spirits'){
+      
     var _spF=function(px,py,sc){
       ctx.fillStyle='rgba(150,110,220,0.9)';
       ctx.beginPath();
