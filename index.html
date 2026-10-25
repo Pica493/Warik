@@ -8302,8 +8302,10 @@ Game.prototype.performAttack=function(a,t){
   /* П10: для снарядов (ranged/siege/fly/heal) armor применяется в applyProj — здесь НЕ применяем */
   var _isProjectileAtk=(a.role==='ranged'||a.role==='siege'||a.role==='fly'||(a.role==='heal'&&t.team!==a.team));
   if(t.isUnit && t.armor && !_isProjectileAtk) dmg=dmg/t.armor;
-  if(t.markedT>0&&t.markedBonus>1) dmg*=t.markedBonus;
-  dmg=dmg*mul;
+  
+  if(t.markedT>0&&t.markedBonus>1 && !_isProjectileAtk) dmg*=t.markedBonus;
+if(_isProjectileAtk) mul=1;
+dmg=dmg*mul;
   if(a.role==='spear'&&t.role==='cav') dmg*=2.2;
   if(a.role==='ranged'&&t.role==='fly') dmg*=1.5;
   if(a.role==='siege'&&t.isBuilding) dmg*=2.5;
