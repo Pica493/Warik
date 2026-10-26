@@ -296,7 +296,7 @@ var BLD_NAMES={
 };
 var DEFAULT_KEYS={ability1:'q',ability2:'w',ability3:'e',ability4:'r',attack:'a',stop:'s',patrol:'p',selectAll:'a',jumpHero:'f1',camUp:'arrowup',camDown:'arrowdown',camLeft:'arrowleft',camRight:'arrowright'};
 var Settings={volume:0.4,music:0.25,edgeScroll:1,language:'ru',difficulty:'normal',quality:'medium',_isMobile:false,keys:JSON.parse(JSON.stringify(DEFAULT_KEYS)),
-  load:function(){try{var s=JSON.parse(localStorage.getItem('echo33')||'{}');for(var k in s) if(this[k]!==undefined&&k!=='gameSpeed') this[k]=s[k];if(this.language&&T[this.language]) LC=this.language;else LC='ru';if(!this.keys||typeof this.keys!=='object') this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));else{for(var dk in DEFAULT_KEYS){if(typeof this.keys[dk]!=='string') this.keys[dk]=DEFAULT_KEYS[dk];}}}catch(e){LC='ru';this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));}},
+  load:function(){try{var s=JSON.parse(localStorage.getItem('echo33')||'{}');for(var k in s) if(this[k]!==undefined) this[k]=s[k];if(this.language&&T[this.language]) LC=this.language;else LC='ru';if(!this.keys||typeof this.keys!=='object') this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));else{for(var dk in DEFAULT_KEYS){if(typeof this.keys[dk]!=='string') this.keys[dk]=DEFAULT_KEYS[dk];}}}catch(e){LC='ru';this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));}},
   save:function(){try{localStorage.setItem('echo33',JSON.stringify({volume:this.volume,music:this.music,edgeScroll:this.edgeScroll,language:this.language,difficulty:this.difficulty,quality:this.quality,keys:this.keys}));}catch(e){}}};
 var BUILDING_UNLOCK={1:['townhall','house','barracks','lumber','tower'],2:['townhall','house','barracks','lumber','tower','forge','altar'],3:['townhall','house','barracks','lumber','tower','forge','altar','magic']};
 var MAX_TH_PER_PLAYER=6;
@@ -8087,7 +8087,11 @@ Game.prototype._findPriorityTarget=function(bld){
     var d2=(u.x-bld.x)*(u.x-bld.x)+(u.y-bld.y)*(u.y-bld.y);
     if(d2>r2) continue;
     if(!this.isVisibleForTeam(bld.team,u.x,u.y)) continue;
+   
+    
     var prio=rolePrio[u.role]||10;
+if(u.lastAttacker===bld) prio+=50;
+    
     var score=prio-d2*0.001;
     if(score>bestScore){bestScore=score;best=u;}
   }
