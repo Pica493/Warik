@@ -5261,6 +5261,19 @@ function getBuildingIconURL(race,kind,towerUpgrade){
   ctx.restore();
   var url=c.toDataURL();TOOL_ICONS[key]=url;return url;
 }
+
+var TOOL_ICONS={};
+var _TOOL_IMG_CACHE={};
+function _getToolImg(kind,size){
+  size=size||32;
+  var k=kind+'@'+size;
+  if(_TOOL_IMG_CACHE[k]) return _TOOL_IMG_CACHE[k];
+  var img=new Image();
+  img.src=toolIconURL(kind,32);
+  _TOOL_IMG_CACHE[k]=img;
+  return img;
+}
+      
 function toolIconImg(kind,size){return '<img src="'+toolIconURL(kind,size)+'" alt="">';}
 
   
@@ -5358,7 +5371,6 @@ function toolIconImg(kind,size){return '<img src="'+toolIconURL(kind,size)+'" al
       ctx.strokeStyle='#3a2010';ctx.lineWidth=0.5;ctx.stroke();
       ctx.fillStyle='#3a2010';ctx.fillRect(wx-2,wy,4,2);
     }
-  }
 
       } else if(kind==='finishBuild'){
   ctx.fillStyle='#8a6a3a';ctx.fillRect(6,18,20,10);
@@ -13374,6 +13386,130 @@ UISys.prototype._renderKeySettings=function(){
   }
 };
 
+UISys.prototype._showWc3Tooltip=function(btn,text){
+  var tip=this.$('wc3-tooltip');if(!tip||!text) return;
+  var lines=String(text).split('\n').filter(function(s){return s.length>0;});
+  if(!lines.length){tip.classList.remove('show');return;}
+  var title=lines[0];
+  var keyM=title.match(/^\[([A-Z])\]\s*/);
+  var keyTag='';
+  if(keyM){keyTag='<span class="tt-key">'+keyM[1]+'</span>';title=title.replace(/^\[[A-Z]\]\s*/,'');}
+  var stats=[],desc=[];
+  for(var i=1;i<lines.length;i++){
+    var L=lines[i].trim();
+    if(!L) continue;
+    if(/^[А-Яа-яA-Za-z][А-Яа-яA-Za-z0-9 _\-]{0,28}:/.test(L)){
+      var idx=L.indexOf(':');
+      stats.push({k:L.substring(0,idx).trim(),v:L.substring(idx+1).trim()});
+    } else {
+      desc.push(L);
+    }
+  }
+  var _sz=13;
+  var _mk=function(k){
+    return ' <img src="'+toolIconURL(k,_sz)+'" style="width:'+_sz+'px;height:'+_sz+'px;vertical-align:-2px">';
+  };
+  var _icoForKey=function(k){
+    var lk=String(k).toLowerCase().trim();
+    if(/^(hp|здоровье|health|очки здоровья)$/.test(lk)) return _mk('hp');
+    if(/^(урон|damage|атака|attack|дамаг)$/.test(lk)) return _mk('weapon_melee');
+    if(/^(броня|armor|защита)$/.test(lk)) return _mk('shield');
+    if(/^(дальность|range|радиус|radius)$/.test(lk)) return _mk('range');
+    if(/^(скорость|speed)$/.test(lk)) return _mk('speed');
+    if(/^(еда|food)$/.test(lk)) return _mk('meat');
+    if(/^(золото|gold|стоимость|cost)$/.test(lk)) return _mk('gold');
+    if(/^(дерево|wood)$/.test(lk)) return _mk('wood');
+    if(/^(время|time|кулдаун|cd)$/.test(lk)) return _mk('time');
+    if(/^(мана|mana)$/.test(lk)) return _mk('mana');
+    return '';
+  };
+  var html='<div class="tt-title">'+keyTag+title+'</div>';
+  for(var ss=0;ss<stats.length;ss++){
+    html+='<div class="tt-stat"><span class="k">'+stats[ss].k+':</span><span class="v">'+stats[ss].v+_icoForKey(stats[ss].k)+'</span></div>';
+  }
+  if(desc.length){
+    var descHtml=desc.join('\n');
+    var _repl=function(re,key){
+      descHtml=descHtml.replace(re,function(m,pre,word,num){return pre+word+' '+num+_mk(key);});
+    };
+    _repl(/(^|[\s.,;:!?«»"()])(HP|Здоровье|Health)\s+(\d+(?:\/[\d]+)?)/gi,'hp');
+    _repl(/(^|[\s.,;:?«»"()])(Урон|Damage|Атака|Attack)\s+(\d+)/gi,'weapon_melee');
+    _repl(/(^|[\s.,;:?«»"()])(Броня|Armor)\s+([\d.]+)/gi,'shield');
+    _repl(/(^|[\s.,;:?«»"()])(Дальность|Range|Радиус)\s+(\d+)/gi,'range');
+    _repl(/(^|[\s.,;:?«»"()])(Скорость|Speed)\s+(\d+)/gi,'speed');
+    _repl(/(^|[\s.,;:?«»"()])(Золото|Gold)\s+(\d+)/gi,'gold');
+    _repl(/(^|[\s.,;:?«»"()])(Дерево|Wood)\s+(\d+)/gi,'wood');
+    _repl(/(^|[\s.,;:?«»"()])(Еда|Food)\s+(\d+)/gi,'meat');
+    _repl(/(^|[\s.,;:?«»"()])(Время|Time)\s+(\d+)/gi,'time');
+    _repl(/(^|[\s.,;:?«»"()])(Мана|Mana)\s+(\d+)/gi,'mana');
+    html+='<div class="tt-desc">'+descHtml+'</div>';
+  }
+  tip.innerHTML=html;
+  tip.classList.add('show');
+  var r=btn.getBoundingClientRect();
+  var tw=tip.offsetWidth,th=tip.offsetHeight;
+  var left=r.right+10,top=r.top;
+  if(left+tw>window.innerWidth-8){left=r.left-tw-10;}
+  if(left<8) left=8;
+  if(top+th>window.innerHeight-8) top=window.innerHeight-th-8;
+  if(top<8) top=8;
+  tip.style.left=left+'px';
+  tip.style.top=top+'px';
+};
+UISys.prototype._hideWc3Tooltip=function(){
+  var tip=this.$('wc3-tooltip');if(tip) tip.classList.remove('show');
+};
+UISys.prototype._showPortraitTooltip=function(anchorEl,ent){
+  var tip=this.$('wc3-tooltip');if(!tip) return;
+  var _sz=13;
+  var _mk=function(k){return ' <img src="'+toolIconURL(k,_sz)+'" style="width:'+_sz+'px;height:'+_sz+'px;vertical-align:-2px">';};
+  var html='';
+  if(ent.isUnit){
+    var _n=ent.isHero?('⭐ '+(t_('hero_'+(ent.heroType||'paladin'))||uName(ent.race,'hero'))):uName(ent.race,ent.role);
+    html+='<div class="tt-title">'+_n+(ent.isHero?' Ур.'+ent.level:'')+'</div>';
+    html+='<div class="tt-stat"><span class="k">HP:</span><span class="v">'+Math.ceil(ent.hp)+'/'+ent.maxHp+_mk('hp')+'</span></div>';
+    var _upT=Game_?Game_.getUnitUpgrades(ent.pid,ent.role):{w:0,a:0};
+    var _dmgMulT=1+0.15*_upT.w;
+    if(Game_&&Game_.auraCache&&Game_.auraCache.dmg&&Game_.auraCache.dmg[ent.id]) _dmgMulT*=1.15;
+    var _finDmgT=Math.round(ent.dmg*_dmgMulT);
+    var _bdT=_finDmgT-ent.dmg;
+    var _bArmorT=ent.armor||1;
+    var _eArmorT=_upT.a>0?_bArmorT/(1-0.08*_upT.a):_bArmorT;
+    var _bArmT=_eArmorT-_bArmorT;
+    html+='<div class="tt-stat"><span class="k">Урон:</span><span class="v">'+ent.dmg+(_bdT>0?' <span style="color:#7cff5a">+'+_bdT+'</span>':'')+_mk('weapon_melee')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Дальность:</span><span class="v">'+ent.range+_mk('range')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Скорость:</span><span class="v">'+ent.spd+_mk('speed')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Броня:</span><span class="v">'+_bArmorT.toFixed(2)+(_bArmT>0.005?' <span style="color:#7cff5a">+'+_bArmT.toFixed(2)+'</span>':'')+_mk('shield')+'</span></div>';
+    if(ent.isHero||ent.isHealer) html+='<div class="tt-stat"><span class="k">Мана:</span><span class="v">'+Math.floor(ent.mana||0)+'/'+(ent.maxMana||100)+_mk('mana')+'</span></div>';
+    var _dk='u_'+ent.role+'_desc';var _d=t_(_dk);
+    if(_d&&_d!==_dk) html+='<div class="tt-desc">'+_d+'</div>';
+  } else if(ent.isBuilding){
+    html+='<div class="tt-title">'+bldName(ent.race,ent.kind)+(ent.completed?' Ур.'+ent.level:' ...')+'</div>';
+    html+='<div class="tt-stat"><span class="k">HP:</span><span class="v">'+Math.ceil(ent.hp)+'/'+ent.maxHp+_mk('hp')+'</span></div>';
+    if(ent.atk) html+='<div class="tt-stat"><span class="k">Урон:</span><span class="v">'+ent.atk+_mk('weapon_melee')+'</span></div>';
+    if(ent.rng) html+='<div class="tt-stat"><span class="k">Дальность:</span><span class="v">'+ent.rng+_mk('range')+'</span></div>';
+    if(ent.pop) html+='<div class="tt-stat"><span class="k">Еда:</span><span class="v">+'+ent.pop+_mk('meat')+'</span></div>';
+    var _bk='d_'+ent.kind;var _bd=t_(_bk);
+    if(_bd&&_bd!==_bk) html+='<div class="tt-desc">'+_bd+'</div>';
+  } else if(ent.isCreep){
+    var _cn=getCreepName(ent.kind);
+    html+='<div class="tt-title">'+_cn+' Lv.'+ent.level+(ent.isBoss?' BOSS':'')+'</div>';
+    html+='<div class="tt-stat"><span class="k">HP:</span><span class="v">'+Math.ceil(ent.hp)+'/'+ent.maxHp+_mk('hp')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Урон:</span><span class="v">'+ent.dmg+_mk('weapon_melee')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Броня:</span><span class="v">'+ent.armor.toFixed(2)+_mk('shield')+'</span></div>';
+    html+='<div class="tt-stat"><span class="k">Награда:</span><span class="v">'+ent.goldReward+_mk('gold')+'</span></div>';
+  }
+  tip.innerHTML=html;tip.classList.add('show');
+  var r=anchorEl.getBoundingClientRect();
+  var tw=tip.offsetWidth,th=tip.offsetHeight;
+  var left=r.right+10,top=r.top;
+  if(left+tw>window.innerWidth-8) left=r.left-tw-10;
+  if(left<8) left=8;
+  if(top+th>window.innerHeight-8) top=window.innerHeight-th-8;
+  if(top<8) top=8;
+  tip.style.left=left+'px';tip.style.top=top+'px';
+};
+      
       UISys.prototype.showScreen=function(id){
   var screens=document.querySelectorAll('.screen');
   for(var i=0;i<screens.length;i++) screens[i].classList.remove('active');
