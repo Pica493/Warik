@@ -9529,6 +9529,420 @@ Game.prototype.findVisibleResourceForWorker=function(u,kind,radius){
   }
 };
 
+Game.prototype.hasSelectedCombat=function(){for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.sel&&u.pid===this.playerPid&&u.role!=='worker'&&!u.dying) return true;}return false;};
+Game.prototype.togglePause=function(){this.paused=!this.paused;UI.togglePause(this.paused);};
+Game.prototype._getUnitSpriteSize=function(u){
+  if(u.role==='cav') return {w:100,h:126,f:0.95};
+  if(u.role==='siege') return {w:100,h:100,f:1};
+  if(u.role==='fly') return {w:(u.race==='gromborn'?120:90),h:(u.race==='gromborn'?100:84),f:1};
+  if(u.isHero) return {w:70,h:90,f:0.9};
+  return {w:56,h:74,f:1};
+};
+Game.prototype._pointInUnitBounds=function(wx,wy,u,z){
+  var sz=this._getUnitSpriteSize(u);
+  var top=u.y-sz.h*sz.f*1.10, bot=u.y+sz.h*sz.f*0.18;
+  var left=u.x-sz.w*sz.f*0.68, right=u.x+sz.w*sz.f*0.68;
+  var pad=18/z;
+  return wx>=left-pad && wx<=right+pad && wy>=top-pad && wy<=bot+pad;
+};
+Game.prototype._pointInBuildingBounds=function(wx,wy,b,z){
+  var radX=b.radius*1.2;
+  var radTop=(b.kind==='tower')?b.radius*2.6:b.radius*1.8;
+  var radBot=b.radius*0.35;
+  var pad=10/z;
+  return wx>=b.x-radX-pad && wx<=b.x+radX+pad && wy>=b.y-radTop-pad && wy<=b.y+radBot+pad;
+};
+Game.prototype._pointInCreepBounds=function(wx,wy,c,z){
+  var rad=Math.max(c.radius*1.9,26);
+  var top=c.y-80*0.94+10/z, bot=c.y+80*0.08;
+  var pad=10/z;
+  return wx>=c.x-rad-pad && wx<=c.x+rad+pad && wy>=top-pad && wy<=bot+pad;
+};
+Game.prototype.pickScreen=function(sx,sy){
+  if(!Renderer_) return {};
+  var w=Renderer_.s2w(sx,sy),z=this.camera.zoom||1,i;
+  var bestU=null,bestD=1e9;
+  for(i=0;i<this.units.length;i++){
+    var u=this.units[i];
+    if(u.dead||u.dying) continue;
+    if(u._isTotem) continue;
+    if(u.pid!==this.playerPid && u.team!==this.playerTeam && !this.isVisible(u.x,u.y)) continue;
+    if(!this._pointInUnitBounds(w.x,w.y,u,z)) continue;
+    var dU=(u.x-w.x)*(u.x-w.x)+(u.y-w.y)*(u.y-w.y);
+    if(dU<bestD){bestD=dU;bestU=u;}
+  }
+  if(bestU) return {unit:bestU};
+  var bestC=null,bestCD=1e9;
+  for(i=0;i<this.creeps.length;i++){
+    var cc=this.creeps[i];
+    if(cc.dead||cc.dying) continue;
+    if(!this.isVisible(cc.x,cc.y)) continue;
+    if(!this._pointInCreepBounds(w.x,w.y,cc,z)) continue;
+    var dC=(cc.x-w.x)*(cc.x-w.x)+(cc.y-w.y)*(cc.y-w.y);
+    if(dC<bestCD){bestCD=dC;bestC=cc;}
+  }
+  if(bestC) return {creep:bestC};
+  var bestB=null,bestBD=1e9;
+  for(i=0;i<this.buildings.length;i++){
+    var b=this.buildings[i];if(b.dead) continue;
+    if(b.pid!==this.playerPid && b.team!==this.playerTeam && !this.isVisible(b.x,b.y)) continue;
+    if(!this._pointInBuildingBounds(w.x,w.y,b,z)) continue;
+    var d2b=(b.x-w.x)*(b.x-w.x)+(b.y-w.y)*(b.y-w.y);
+    if(d2b<bestBD){bestBD=d2b;bestB=b;}
+  }
+  if(bestB) return {building:bestB};
+  var bestGold=null,bestGoldD=1e9;
+  for(i=0;i<this.resources.length;i++){
+    var gr=this.resources[i];if(gr.dead||gr.kind!=='gold') continue;
+    var gcy=gr.y-gr.radius*0.5;
+    var dG=(gr.x-w.x)*(gr.x-w.x)+(gcy-w.y)*(gcy-w.y);
+    var innerR=gr.radius*1.15+40/z;
+    if(dG<innerR*innerR&&dG<bestGoldD){bestGoldD=dG;bestGold=gr;}
+  }
+  if(bestGold) return {resource:bestGold};
+  var bestR=null,bestRD=1e9;
+  for(i=0;i<this.resources.length;i++){
+    var rr=this.resources[i];if(rr.dead||rr.kind==='gold') continue;
+    var rcy=rr.y-rr.radius*0.5;
+    var d2r=(rr.x-w.x)*(rr.x-w.x)+(rcy-w.y)*(rcy-w.y);
+    var rrad=rr.radius*1.1+16/z;
+    if(d2r<rrad*rrad&&d2r<bestRD){bestRD=d2r;bestR=rr;}
+  }
+  if(bestR) return {resource:bestR};
+  return {};
+};
+Game.prototype.handleLeftClick=function(sx,sy,add){
+  var pick=this.pickScreen(sx,sy),i;
+  var hasOwnSel=false;
+  for(i=0;i<this.units.length;i++) if(this.units[i].sel&&this.units[i].pid===this.playerPid){hasOwnSel=true;break;}
+  if(!hasOwnSel){
+    for(i=0;i<this.buildings.length;i++) if(this.buildings[i].sel&&this.buildings[i].pid===this.playerPid){hasOwnSel=true;break;}
+  }
+  if((pick.unit&&pick.unit.pid!==this.playerPid)||(pick.building&&pick.building.pid!==this.playerPid)){
+    if(hasOwnSel){
+      var target=pick.unit||pick.building;
+      var sel=[];
+      for(i=0;i<this.units.length;i++){var su=this.units[i];if(su.sel&&su.pid===this.playerPid&&!su.dying) sel.push(su);}
+      for(var wi=0;wi<sel.length;wi++){
+        var u2=sel[wi];
+        u2.stationed=false;
+        u2._speedLimit=null;u2._armyTag=null;
+        if(u2.role==='worker'){u2.moveTo={x:target.x,y:target.y};u2._path=null;u2._pathIdx=0;continue;}
+        u2.target=target;u2.lockedTarget=target;u2.moveTo=null;u2.gatherTarget=null;
+        u2.stance='aggressive';u2.patrolRoute=null;u2._retreating=false;
+        u2.attackMoveTo={x:target.x,y:target.y};
+      }
+      Audio.sfx('notify');
+      return;
+    }
+    for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
+    for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
+    this.selResource=null;
+    if(pick.unit){this.inspectUnit=pick.unit;this.inspectBuilding=null;UI.showInspectInfo(pick.unit);}
+    else{this.inspectBuilding=pick.building;this.inspectUnit=null;UI.showInspectInfo(pick.building);}
+    return;
+  }
+  if(pick.creep){
+    if(hasOwnSel){
+      var selC=[];
+      for(i=0;i<this.units.length;i++){var suc=this.units[i];if(suc.sel&&suc.pid===this.playerPid&&!suc.dying) selC.push(suc);}
+      for(var wiC=0;wiC<selC.length;wiC++){
+        var u2c=selC[wiC];
+        u2c.stationed=false;
+        u2c._speedLimit=null;u2c._armyTag=null;
+        if(u2c.role==='worker'){u2c.moveTo={x:pick.creep.x,y:pick.creep.y};u2c._path=null;u2c._pathIdx=0;continue;}
+        u2c.target=pick.creep;u2c.lockedTarget=pick.creep;u2c.moveTo=null;u2c.gatherTarget=null;
+        u2c.stance='aggressive';u2c.patrolRoute=null;u2c._retreating=false;
+        u2c.attackMoveTo={x:pick.creep.x,y:pick.creep.y};
+      }
+      Audio.sfx('notify');
+      return;
+    }
+    for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
+    for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
+    this.selResource=null;
+    this.inspectUnit=pick.creep;this.inspectBuilding=null;
+    UI.showInspectInfo(pick.creep);
+    return;
+  }
+  UI.hideInspectInfo();
+  this.inspectUnit=null;this.inspectBuilding=null;
+  if(pick.resource){
+    if(!hasOwnSel){
+      for(i=0;i<this.units.length;i++) this.units[i].sel=false;
+      for(i=0;i<this.buildings.length;i++) this.buildings[i].sel=false;
+      this.selResource=pick.resource;
+      UI.refreshSelection();
+    }
+    return;
+  }
+  this.selResource=null;
+  if(pick.unit&&pick.unit.pid===this.playerPid){
+    var u=pick.unit;
+    var wasActiveUnit=(UI._activeUnitId===u.id&&u.sel);
+    if(add) u.sel=!u.sel;
+    else{for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;u.sel=true;}
+    if(wasActiveUnit&&!add&&Renderer_){this.camera.x=u.x;this.camera.y=u.y;clampCam();}
+    UI._activeUnitId=u.id;
+  } else if(pick.building&&pick.building.pid===this.playerPid){
+    if(!add){for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;}
+    pick.building.sel=true;
+  } else if(!add){
+    for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
+    for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
+  }
+  UI.refreshSelection();
+  if(UI.refreshUnitBar) UI.refreshUnitBar();
+};
+Game.prototype.handleDoubleClick=function(sx,sy,add){
+  var pick=this.pickScreen(sx,sy);
+  if(!pick.unit||pick.unit.pid!==this.playerPid) return this.handleLeftClick(sx,sy,add);
+  var targetUnit=pick.unit,targetRole=targetUnit.role,targetRace=targetUnit.race,targetIsHero=targetUnit.isHero;
+  var cam=this.camera;
+  var vx0=cam.x-(Renderer_?Renderer_.w:1200)/2/cam.zoom;
+  var vx1=cam.x+(Renderer_?Renderer_.w:1200)/2/cam.zoom;
+  var vy0=cam.y-(Renderer_?Renderer_.h:800)/2/cam.zoom;
+  var vy1=cam.y+(Renderer_?Renderer_.h:800)/2/cam.zoom;
+  if(!add){for(var i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;}
+  var count=0;
+  for(var j=0;j<this.units.length;j++){
+    var u=this.units[j];
+    if(u.pid!==this.playerPid||u.dying) continue;
+    if(u.role!==targetRole||u.race!==targetRace||u.isHero!==targetIsHero) continue;
+    if(u.x<vx0||u.x>vx1||u.y<vy0||u.y>vy1) continue;
+    u.sel=true;count++;
+  }
+  if(count>0&&Renderer_){
+    var _cx=0,_cy=0,_cn=0;
+    for(var _dj=0;_dj<this.units.length;_dj++){var _du=this.units[_dj];if(_du.sel&&_du.pid===this.playerPid&&!_du.dying){_cx+=_du.x;_cy+=_du.y;_cn++;}}
+    if(_cn>0){this.camera.x=_cx/_cn;this.camera.y=_cy/_cn;clampCam();}
+  }
+  this.selResource=null;
+  UI.refreshSelection();
+  if(count>1&&UI) UI.showHint('Выделено: '+count+' '+uName(targetRace,targetRole),1.5);
+};
+Game.prototype.handleBoxSelect=function(box,add){
+  var i;
+  if(!add){for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;}
+  if(!Renderer_) return;
+  var p1=Renderer_.s2w(box.x1,box.y1),p2=Renderer_.s2w(box.x2,box.y2);
+  var x0=Math.min(p1.x,p2.x),x1=Math.max(p1.x,p2.x),y0=Math.min(p1.y,p2.y),y1=Math.max(p1.y,p2.y);
+  for(i=0;i<this.units.length;i++){var u=this.units[i];if(u.pid!==this.playerPid||u.dying) continue;if(u.x>=x0&&u.x<=x1&&u.y>=y0&&u.y<=y1) u.sel=true;}
+  this.selResource=null;
+  this.inspectUnit=null;this.inspectBuilding=null;
+  UI.refreshSelection();
+};
+Game.prototype.handleRightClick=function(sx,sy){
+  if(UI._placingKind) return;if(!Renderer_) return;
+  var w=Renderer_.s2w(sx,sy);
+  if(Input.pendingRallyPoint){
+    var rb=Input.pendingRallyPoint;
+    if(!rb.dead){rb.rallyPoint={x:w.x,y:w.y};Audio.sfx('click');UI.showHint('Точка сбора установлена',1.5);}
+    Input.pendingRallyPoint=null;
+    if(UI) UI.hideOrderBar();
+    return;
+  }
+  var sel=[];
+  for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.sel&&u.pid===this.playerPid&&!u.dying) sel.push(u);}
+  if(!sel.length){if(Input.pendingOrder){Input.pendingOrder=null;if(UI) UI.hideOrderBar();}return;}
+  if(Input.pendingOrder==='attack'){
+    for(var ai=0;ai<sel.length;ai++){
+      var au=sel[ai];
+      au._retreating=false;
+      au._autoAcquired=false;au._autoOrigin=null;au._savedMoveTo=null;au._savedAttackMoveTo=null;au._savedPatrolRoute=null;
+      au.stationed=false;
+      au._speedLimit=null;au._armyTag=null;
+      au.attackMoveTo={x:w.x,y:w.y};au.patrolRoute=null;au.moveTo=null;au.target=null;au.lockedTarget=null;au.gatherTarget=null;au.buildTarget=null;au.repairTarget=null;au.demolishTarget=null;au._path=null;au._pathIdx=0;
+    }
+    Input.pendingOrder=null;if(UI) UI.hideOrderBar();Audio.sfx('click');return;
+  }
+  if(Input.pendingOrder==='patrol'){
+    for(var pi=0;pi<sel.length;pi++){
+      var pu=sel[pi];
+      pu._retreating=false;
+      pu._autoAcquired=false;pu._autoOrigin=null;pu._savedMoveTo=null;pu._savedAttackMoveTo=null;pu._savedPatrolRoute=null;
+      pu.stationed=false;
+      pu._speedLimit=null;pu._armyTag=null;
+      pu.patrolRoute={p1:{x:pu.x,y:pu.y},p2:{x:w.x,y:w.y}};pu.patrolIdx=1;pu.attackMoveTo=null;pu.moveTo=null;pu.target=null;pu.lockedTarget=null;pu.gatherTarget=null;pu.buildTarget=null;pu.repairTarget=null;pu.demolishTarget=null;pu._path=null;pu._pathIdx=0;
+    }
+    Input.pendingOrder=null;if(UI) UI.hideOrderBar();Audio.sfx('click');return;
+  }
+  this.applyRightClick(w.x,w.y,sel);
+};
+Game.prototype.selectAllCombat=function(){for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.pid===this.playerPid&&u.role!=='worker'&&!u.dying) u.sel=true;}this.selResource=null;UI.refreshSelection();};
+Game.prototype.selectWorkers=function(){for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.pid===this.playerPid&&u.role==='worker'&&!u.dying) u.sel=true;}this.selResource=null;UI.refreshSelection();};
+Game.prototype.deselectAll=function(){for(var i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;for(var i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;this.selResource=null;this.inspectUnit=null;this.inspectBuilding=null;UI.hideInspectInfo();UI.refreshSelection();};
+Game.prototype.setStance=function(stance){
+  for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.sel&&u.pid===this.playerPid&&u.role!=='worker'){u.stance=stance;if(stance==='hold'){u.originX=u.x;u.originY=u.y;}}}
+  UI.refreshSelection();
+};
+Game.prototype.applyRightClick=function(wx,wy,sel){
+  for(var _rri=0;_rri<sel.length;_rri++){
+    sel[_rri]._retreating=false;
+    sel[_rri]._autoAcquired=false;
+    sel[_rri]._autoOrigin=null;
+    sel[_rri]._savedMoveTo=null;
+    sel[_rri]._savedAttackMoveTo=null;
+    sel[_rri]._savedPatrolRoute=null;
+    sel[_rri].stationed=false;
+    sel[_rri]._speedLimit=null;
+    sel[_rri]._armyTag=null;
+  }
+  var z=this.camera.zoom||1,wi;
+  var bestB=null,bestBD=1e9;
+  for(var bi=0;bi<this.buildings.length;bi++){
+    var b=this.buildings[bi];if(b.dead) continue;
+    if(!this._pointInBuildingBounds(wx,wy,b,z)) continue;
+    var d2=(b.x-wx)*(b.x-wx)+(b.y-wy)*(b.y-wy);
+    if(d2<bestBD){bestBD=d2;bestB=b;}
+  }
+  var bestU=null,bestUD=1e9,bestC=null,bestCD=1e9;
+  for(var i=0;i<this.units.length;i++){
+    var u=this.units[i];if(u.dead||u.dying||u._isTotem) continue;
+    if(!this._pointInUnitBounds(wx,wy,u,z)) continue;
+    var d2u=(u.x-wx)*(u.x-wx)+(u.y-wy)*(u.y-wy);
+    if(d2u<bestUD){bestUD=d2u;bestU=u;}
+  }
+  for(var ci=0;ci<this.creeps.length;ci++){
+    var cc=this.creeps[ci];if(cc.dead||cc.dying) continue;
+    if(!this._pointInCreepBounds(wx,wy,cc,z)) continue;
+    var d2c=(cc.x-wx)*(cc.x-wx)+(cc.y-wy)*(cc.y-wy);
+    if(d2c<bestCD){bestCD=d2c;bestC=cc;}
+  }
+  var selTeam=(sel&&sel.length)?sel[0].team:this.playerTeam;
+  for(wi=0;wi<sel.length;wi++){sel[wi].attackMoveTo=null;sel[wi].patrolRoute=null;}
+  var bestR=null,bestRD=1e9;
+  for(var ri=0;ri<this.resources.length;ri++){
+    var r2=this.resources[ri];if(r2.dead||r2.falling) continue;
+    var cy2=(r2.kind==='gold')?r2.y-r2.radius*0.6:r2.y-r2.radius*0.5;
+    var d2r=(r2.x-wx)*(r2.x-wx)+(cy2-wy)*(cy2-wy);
+    var rrR=(r2.kind==='gold')?(r2.radius*0.9+30/z):(r2.radius*0.9+20/z);
+    if(d2r<rrR*rrR&&d2r<bestRD){bestRD=d2r;bestR=r2;}
+  }
+  if(bestR){
+    var currentGatherers=0;
+    if(bestR.kind==='gold'){for(var gi=0;gi<this.units.length;gi++){var wg=this.units[gi];if(wg.gatherTarget===bestR&&!wg.dying) currentGatherers++;}}
+    for(wi=0;wi<sel.length;wi++){
+      var u2=sel[wi];
+      if(u2.role==='worker'){
+        u2.target=null;u2.lockedTarget=null;u2.moveTo=null;u2.buildTarget=null;u2.repairTarget=null;u2.demolishTarget=null;u2.carrying=null;u2.carryAmt=0;u2.gatherProgress=0;u2.gatherAnimT=0;u2._stuckTimer=0;u2._insideMine=false;u2._mineSlot=-1;u2._waitingForMine=false;u2._path=null;u2._pathIdx=0;
+        if(bestR.kind==='gold'&&currentGatherers>=MAX_GATHER_PER_MINE){
+          u2.gatherTarget=bestR;u2._assignedMine=bestR;
+          this.notify(t_('mineFull'));
+        } else {
+          u2.gatherTarget=bestR;
+          if(bestR.kind==='gold'){ u2._assignedMine=bestR; currentGatherers++; }
+        }
+      } else { u2.moveTo={x:wx,y:wy}; u2.target=null; u2.lockedTarget=null; u2._path=null; u2._pathIdx=0; }
+    }
+    Audio.sfx('click');return;
+  }
+  if(bestU&&(!bestC||bestUD<bestCD)&&bestU.team!==selTeam){
+    for(wi=0;wi<sel.length;wi++){
+      var su=sel[wi];
+      if(su.role==='worker'){su.moveTo={x:wx,y:wy};su._path=null;su._pathIdx=0;su._retreating=false;continue;}
+      su.target=bestU;su.lockedTarget=bestU;su.moveTo=null;su.gatherTarget=null;
+      su.stance='aggressive';su.patrolRoute=null;
+      su.attackMoveTo={x:bestU.x,y:bestU.y};
+      su._path=null;su._pathIdx=0;su._retreating=false;
+    }
+    Audio.sfx('notify');return;
+  }
+  if(bestC){
+    for(wi=0;wi<sel.length;wi++){
+      var _suC=sel[wi];
+      _suC.target=bestC;_suC.lockedTarget=bestC;_suC.moveTo=null;
+      _suC.gatherTarget=null;_suC.stance='aggressive';
+      _suC.patrolRoute=null;
+      _suC.attackMoveTo={x:bestC.x,y:bestC.y};
+      _suC._path=null;_suC._pathIdx=0;_suC._retreating=false;
+    }
+    Audio.sfx('notify');return;
+  }
+  if(bestB){
+    var b2=bestB;
+    var isOwnBuilding=(b2.team===selTeam);
+    if(isOwnBuilding){
+      var workers=[];
+      for(wi=0;wi<sel.length;wi++) if(sel[wi].role==='worker') workers.push(sel[wi]);
+      if(workers.length){
+        if(!b2.completed){
+          for(wi=0;wi<workers.length;wi++){
+            var wk=workers[wi];
+            wk.buildTarget=b2;wk.gatherTarget=null;wk.moveTo=null;wk.repairTarget=null;
+            wk.demolishTarget=null;wk.carrying=null;wk.carryAmt=0;wk.target=null;wk.lockedTarget=null;wk.gatherAnimT=0;
+            wk.attackMoveTo=null;wk.patrolRoute=null;wk._stuckTimer=0;wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;wk._path=null;wk._pathIdx=0;
+          }
+          Audio.sfx('build');return;
+        }
+        if(b2.hp<b2.maxHp){
+          for(wi=0;wi<workers.length;wi++){
+            var wk2=workers[wi];
+            wk2.repairTarget=b2;wk2.buildTarget=null;wk2.gatherTarget=null;wk2.moveTo=null;
+            wk2.target=null;wk2.lockedTarget=null;wk2.repairAccum=0;wk2.gatherAnimT=0;wk2.attackMoveTo=null;
+            wk2.patrolRoute=null;wk2._stuckTimer=0;wk2.demolishTarget=null;wk2._insideMine=false;wk2._mineSlot=-1;wk2._waitingForMine=false;wk2._path=null;wk2._pathIdx=0;
+          }
+          Audio.sfx('repair');return;
+        }
+      }
+    } else {
+      for(wi=0;wi<sel.length;wi++){
+        var _suB=sel[wi];
+        _suB.target=b2;_suB.lockedTarget=b2;_suB.moveTo=null;_suB.gatherTarget=null;
+        _suB.stance='aggressive';_suB.patrolRoute=null;
+        _suB.attackMoveTo={x:b2.x,y:b2.y};
+        _suB._path=null;_suB._pathIdx=0;_suB._retreating=false;
+      }
+      Audio.sfx('notify');return;
+    }
+    var anyWorkerSel=false;
+    for(wi=0;wi<sel.length;wi++){if(sel[wi].role==='worker'){anyWorkerSel=true;break;}}
+    if(isOwnBuilding && !anyWorkerSel && b2.rallyPoint){
+      b2.rallyPoint=null;
+      Audio.sfx('click');
+      if(UI) UI.showHint('Точка сбора убрана',1);
+      return;
+    }
+  }
+  if(sel.length===1){
+    var su1=sel[0];
+    var _sn=this.snapToFree(wx,wy,su1.radius+4);
+    su1.moveTo={x:_sn.x,y:_sn.y};
+    su1.attackMoveTo=null;su1.patrolRoute=null;su1.lockedTarget=null;su1._path=null;su1._pathIdx=0;
+    if(su1.role==='worker'){
+      su1.gatherTarget=null;su1.buildTarget=null;su1.repairTarget=null;su1.demolishTarget=null;su1._insideMine=false;su1._mineSlot=-1;su1._waitingForMine=false;su1._assignedMine=null;
+    }
+  }
+  else{
+    for(wi=0;wi<sel.length;wi++){
+      sel[wi].gatherTarget=null;sel[wi].buildTarget=null;sel[wi].repairTarget=null;
+      sel[wi].demolishTarget=null;sel[wi]._insideMine=false;sel[wi]._mineSlot=-1;
+      sel[wi]._waitingForMine=false;sel[wi]._assignedMine=null;
+      sel[wi]._path=null;sel[wi]._pathIdx=0;
+      sel[wi].lockedTarget=null;
+    }
+    var avgX=0,avgY=0;
+    for(wi=0;wi<sel.length;wi++){avgX+=sel[wi].x;avgY+=sel[wi].y;}
+    avgX/=sel.length;avgY/=sel.length;
+    var baseAngle=Math.atan2(wy-avgY,wx-avgX),angle=baseAngle+Input.formationAngle,form=Input.formation||'box';
+    for(wi=0;wi<sel.length;wi++){
+      var targetX,targetY;
+      if(form==='line'){var perp=angle+Math.PI/2,off=(wi-(sel.length-1)/2)*46;targetX=wx+Math.cos(perp)*off;targetY=wy+Math.sin(perp)*off;}
+      else if(form==='column'){var off2=wi*44;targetX=wx-Math.cos(angle)*off2;targetY=wy-Math.sin(angle)*off2;}
+      else{var cols=Math.ceil(Math.sqrt(sel.length)),row=Math.floor(wi/cols),col=wi%cols,perp2=angle+Math.PI/2,ox=(col-(cols-1)/2)*48,oy=(row-Math.floor((sel.length-1)/cols)/2)*48;targetX=wx+Math.cos(perp2)*ox+Math.cos(angle)*oy;targetY=wy+Math.sin(perp2)*ox+Math.sin(angle)*oy;}
+      var _sn2=this.snapToFree(targetX,targetY,sel[wi].radius+4);
+      sel[wi].moveTo={x:_sn2.x,y:_sn2.y};
+    }
+  }
+  for(wi=0;wi<sel.length;wi++){
+    var wu=sel[wi];
+    if(wu.role!=='worker') continue;
+    wu._insideMine=false;wu._mineSlot=-1;wu._waitingForMine=false;wu._assignedMine=null;
+  }
+  Input.formationAngle=0;
+  Audio.sfx('click');
+};
+      
   Game.prototype.serialize=function(){
   return {
     v:5200,mapId:this.map.id,config:JSON.parse(JSON.stringify(this.config)),time:this.time,
