@@ -5211,6 +5211,9 @@ function getBuildingIconURL(race,kind,towerUpgrade){
   var url=c.toDataURL();ICON_CACHE[key]=url;return url;
 }
 
+function unitIconImg(race,role,heroType){return '<img src="'+getUnitIconURL(race,role,heroType)+'" alt="">';}
+function buildingIconImg(race,kind,towerUpgrade){return '<img src="'+getBuildingIconURL(race,kind,towerUpgrade)+'" alt="">';}
+      
       function getWorkersIconURL(race,size){
   size=size||32;
   var key='workers_all@'+size;
