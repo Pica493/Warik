@@ -13153,3 +13153,2161 @@ UISys.prototype.doLoad=function(slot){
 };
 
       
+UISys.prototype.showInspectInfo=function(ent){
+  var info=this.$('selinfo');
+  if(!info) return;
+  info.classList.add('show');
+  this._inspectEnt=ent;
+  var label;
+  if(ent.isUnit){
+    var _hKey=ent.isHero?('hero_'+(ent.heroType||'paladin')):'';
+    var _hName=ent.isHero?((t_(_hKey)!==_hKey)?t_(_hKey):uName(ent.race,'hero')):'';
+    var name=ent.isHero?('⭐ '+_hName):uName(ent.race,ent.role);
+    label=name+(ent.isHero?(' Ур.'+ent.level):'')+' · T'+(ent.team+1)+' · HP '+Math.ceil(ent.hp)+'/'+ent.maxHp;
+    if(ent.isHero||ent.isHealer) label+=' · Мана '+Math.floor(ent.mana||0)+'/'+(ent.maxMana||100);
+  } else if(ent.isBuilding){
+    label=bldName(ent.race,ent.kind)+(ent.completed?' Ур.'+ent.level:' ...')+' · T'+(ent.team+1)+' · HP '+Math.ceil(ent.hp)+'/'+ent.maxHp;
+  } else if(ent.isCreep){
+    var cn=getCreepName(ent.kind);
+    label=cn+' Lv.'+ent.level+' · HP '+Math.ceil(ent.hp)+'/'+ent.maxHp;
+  } else { label='?'; }
+  info.textContent=label;
+  this.drawPortrait(ent);
+  this.$('cmdpanel').classList.add('show');
+  var box=this.$('actions'); box.innerHTML=''; box.dataset.menu='';
+  this.$('queue-panel').classList.remove('show');
+  this._lastActionsHash='';
+  this._abilityButtons=[];
+};
+UISys.prototype.hideInspectInfo=function(){
+  this._inspectEnt=null;
+  var info=this.$('selinfo');
+  if(info) info.classList.remove('show');
+};
+UISys.prototype.refreshSelection=function(){
+  if(!Game_) return;
+  var g=Game_;
+  if(this._inspectEnt && !this._inspectEnt.dead){
+    var stillSel=false;
+    for(var _ri=0;_ri<g.units.length;_ri++){if(g.units[_ri].sel&&g.units[_ri].pid===g.playerPid){stillSel=true;break;}}
+    for(var _rbi=0;_rbi<g.buildings.length;_rbi++){if(g.buildings[_rbi].sel&&g.buildings[_rbi].pid===g.playerPid){stillSel=true;break;}}
+    if(!stillSel){
+      this.$('cmdpanel').classList.add('show');
+      this.$('actions').innerHTML='';
+      this.$('actions').dataset.menu='';
+      var _info=this.$('selinfo');
+      if(_info) _info.classList.add('show');
+      if(this.refreshUnitBar) this.refreshUnitBar();
+      return;
+    }
+  }
+  this.hideInspectInfo();
+  var sel=[],selB=[];
+  for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
+  for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
+  var info=this.$('selinfo');
+  if(g.selResource&&!sel.length&&!selB.length){
+    var rr=g.selResource;
+    info.classList.add('show');
+    var inside=0,waiting=0;
+    var workersList=[];
+    for(var _wi=0;_wi<g.units.length;_wi++){
+      var _wu=g.units[_wi];
+      if(_wu.pid!==g.playerPid||_wu.dying) continue;
+      if(_wu.gatherTarget===rr){
+        workersList.push(_wu);
+        if(_wu._insideMine) inside++;
+        else if(_wu._waitingForMine) waiting++;
+      }
+    }
+    info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+inside+'/'+MAX_GATHER_PER_MINE+' | Ждут: '+waiting;
+    this.$('cmdpanel').classList.add('show');
+    this.drawMinePortrait(rr,workersList);
+    var box=this.$('actions');box.innerHTML='';box.dataset.menu='';
+    for(var _wi2=0;_wi2<workersList.length;_wi2++){
+      (function(wk){
+        var statusTxt=wk._insideMine?'Внутри':(wk._waitingForMine?'Ждёт':'Идёт');
+        var btn=document.createElement('button');
+        btn.className='act-btn';
+        btn.innerHTML='<div class="ico"><img src="'+getUnitIconURL(wk.race,wk.role,wk.heroType)+'"></div><div class="lbl">'+uName(wk.race,wk.role)+'</div><div class="price"><div>'+statusTxt+'</div></div>';
+        btn.onclick=function(){
+          for(var _ci=0;_ci<g.units.length;_ci++){
+            g.units[_ci].sel=(g.units[_ci].pid===g.playerPid)&&(g.units[_ci]===wk);
+          }
+          UI.refreshSelection();
+        };
+        box.appendChild(btn);
+      })(workersList[_wi2]);
+    }
+    this.$('queue-panel').classList.remove('show');
+    this._lastActionsHash='';
+    this._abilityButtons=[];
+    if(this.refreshUnitBar) this.refreshUnitBar();
+    return;
+  }
+  if(!sel.length&&!selB.length){info.classList.remove('show');this.$('actions').innerHTML='';this.drawPortrait(null);this._lastActionsHash='';this.$('cmdpanel').classList.remove('show');this.$('queue-panel').classList.remove('show');if(this.refreshUnitBar) this.refreshUnitBar();return;}
+  this.$('cmdpanel').classList.add('show');info.classList.add('show');
+  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
+  else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
+  else{var b2=selB[0];info.textContent=bldName(b2.race,b2.kind)+(b2.completed?' Ур.'+b2.level:' ...')+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;}
+  var activeEnt=null;
+  for(var _ai=0;_ai<sel.length;_ai++){if(sel[_ai].id===this._activeUnitId){activeEnt=sel[_ai];break;}}
+  this.drawPortrait(activeEnt||sel[0]||selB[0]);
+  this.renderActions(true);
+  if(selB.length===1&&selB[0].queue.length>0) this.$('queue-panel').classList.add('show');
+  else this.$('queue-panel').classList.remove('show');
+  if(this.refreshUnitBar) this.refreshUnitBar();
+};
+UISys.prototype.refreshInfoOnly=function(){
+  if(!Game_) return;
+  var g=Game_,sel=[],selB=[];
+  for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
+  for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
+  if(!sel.length&&!selB.length) return;
+  var info=this.$('selinfo');
+  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
+  else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
+  else{var b2=selB[0];info.textContent=bldName(b2.race,b2.kind)+(b2.completed?' Ур.'+b2.level:' ...')+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;}
+};
+UISys.prototype.refreshUnitBar=function(){
+  var bar=this.$('unit-bar');if(!bar) return;
+  if(!Game_){bar.classList.remove('show');bar.innerHTML='';this._activeUnitId=null;return;}
+  var g=Game_,sel=[];
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);
+  }
+  if(sel.length<=1){bar.classList.remove('show');bar.innerHTML='';this._activeUnitId=null;return;}
+  bar.classList.add('show');
+  sel.sort(function(a,b){
+    if(a.isHero!==b.isHero) return a.isHero?-1:1;
+    return a.id-b.id;
+  });
+  var hashParts=[];
+  for(var hi=0;hi<sel.length;hi++){
+    var su=sel[hi];
+    hashParts.push(su.id+'.'+Math.floor(su.hp/su.maxHp*20));
+  }
+  var hash=hashParts.join('|');
+  var activeId=this._activeUnitId;
+  var stillThere=false;
+  for(var sj=0;sj<sel.length;sj++){if(sel[sj].id===activeId){stillThere=true;break;}}
+  if(!stillThere){activeId=sel[0].id;this._activeUnitId=activeId;}
+  if(bar.dataset.hash!==hash||bar.dataset.active!==String(activeId)){
+    bar.dataset.hash=hash;bar.dataset.active=String(activeId);
+    bar.innerHTML='';
+    for(var si=0;si<sel.length;si++){
+      (function(u2){
+        var btn=document.createElement('div');
+        btn.className='ubtn'+(u2.id===activeId?' active':'');
+        var iconSrc;
+        if(u2.isHero) iconSrc=getUnitIconURL(u2.race,'hero',u2.heroType);
+        else iconSrc=getUnitIconURL(u2.race,u2.role);
+        var hpPct=Math.max(0,Math.min(100,Math.round(u2.hp/u2.maxHp*100)));
+        var hpCol=hpPct>50?'#3aa03a':hpPct>25?'#c0a030':'#c02020';
+        btn.innerHTML='<img src="'+iconSrc+'" alt=""><div class="hp-bar"><div class="hp-fill" style="width:'+hpPct+'%;background:'+hpCol+'"></div></div>';
+        btn.onclick=function(e){
+          e.stopPropagation();
+          var wasActive=(UI._activeUnitId===u2.id);
+          UI._activeUnitId=u2.id;
+          if(wasActive&&Game_&&Renderer_){Game_.camera.x=u2.x;Game_.camera.y=u2.y;clampCam();}
+          UI.drawPortrait(u2);
+          UI.refreshUnitBar();
+          UI.renderActions(true);
+        };
+        bar.appendChild(btn);
+      })(sel[si]);
+    }
+  }
+  var activeBtn=bar.querySelector('.ubtn.active');
+  if(activeBtn&&activeBtn.scrollIntoView){
+    try{activeBtn.scrollIntoView({inline:'nearest',block:'nearest'});}catch(e){}
+  }
+};
+UISys.prototype.cycleActiveUnit=function(dir){
+  if(!Game_) return;
+  var sel=[];
+  for(var i=0;i<Game_.units.length;i++){
+    var u=Game_.units[i];
+    if(u.sel&&u.pid===Game_.playerPid&&!u.dying) sel.push(u);
+  }
+  if(sel.length<=1) return;
+  sel.sort(function(a,b){return a.id-b.id;});
+  var curIdx=0;
+  for(var j=0;j<sel.length;j++){if(sel[j].id===this._activeUnitId){curIdx=j;break;}}
+  curIdx=(curIdx+dir+sel.length)%sel.length;
+  this._activeUnitId=sel[curIdx].id;
+  if(Renderer_){Game_.camera.x=sel[curIdx].x;Game_.camera.y=sel[curIdx].y;clampCam();}
+  this.refreshUnitBar();
+  this.drawPortrait(sel[curIdx]);
+  this.renderActions(true);
+  this.refreshInfoOnly();
+};
+
+      UISys.prototype.drawPortrait=function(ent){
+  var cv=this.$('portrait-canvas'),info=this.$('portrait-info');
+  if(!cv) return;
+  var ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var bgGrad=ctx.createLinearGradient(0,0,0,cv.height);
+  bgGrad.addColorStop(0,'#1a2438');bgGrad.addColorStop(1,'#050810');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,cv.width,cv.height);
+  if(!ent){info.innerHTML='<div class="pname">—</div>';return;}
+  try{
+    if(ent.isUnit){
+      var useDir=((ent.role==='cav')||(ent.role==='siege'))?DIR.RIGHT:DIR.DOWN;
+      var sp=bakeUnit(ent.race,ent.role,ent.team,useDir,0,ent.heroType);
+      var pad=14;
+      var s=Math.min((cv.width-pad*2)/sp.width,(cv.height-pad*2)/sp.height);
+      var dw=sp.width*s,dh=sp.height*s,dx=(cv.width-dw)/2,dy=(cv.height-dh)/2;
+      var legDef=getLeg(ent.role);
+      if(legDef&&ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'){
+        var legW=legDef.w*s*0.9,legH=legDef.h*s*0.85,legSpread=legDef.spread*s*0.8;
+        var legBottomY=dy+dh,legTopY=legBottomY-legH,pcx=cv.width/2;
+        ctx.fillStyle='#3a2010';ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(0.5,s*0.6);
+        ctx.fillRect(pcx-legSpread-legW/2,legTopY,legW,legH);ctx.strokeRect(pcx-legSpread-legW/2,legTopY,legW,legH);
+        ctx.fillRect(pcx+legSpread-legW/2,legTopY,legW,legH);ctx.strokeRect(pcx+legSpread-legW/2,legTopY,legW,legH);
+      }
+      ctx.drawImage(sp,dx,dy,dw,dh);
+      if(ent.role==='siege'){
+        var btmY2=dy+dh*0.98;
+        var wR2=(ent.race==='gromborn'?12:ent.race==='luminite'?13:11)*s;
+        var wheelY2=btmY2-wR2;
+        var wheelX1b=cv.width/2-22*s, wheelX2b=cv.width/2+22*s;
+        var drawW2=function(wx,wy,r){
+          if(ent.race==='gromborn'){
+            ctx.fillStyle='#2a2a2a';ctx.beginPath();ctx.arc(wx,wy,r,0,TAU);ctx.fill();
+            ctx.strokeStyle='#0a0a0a';ctx.lineWidth=2.2*s;ctx.stroke();
+            ctx.strokeStyle='#6a6a6a';ctx.lineWidth=1.6*s;
+            for(var k=0;k<6;k++){var a=k/6*TAU;ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+Math.cos(a)*r*0.85,wy+Math.sin(a)*r*0.85);ctx.stroke();}
+            ctx.fillStyle='#8a8a8a';ctx.beginPath();ctx.arc(wx,wy,r*0.3,0,TAU);ctx.fill();
+            ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1.2*s;ctx.stroke();
+          } else if(ent.race==='luminite'){
+            ctx.fillStyle='#4a2a10';ctx.beginPath();ctx.arc(wx,wy,r,0,TAU);ctx.fill();
+            ctx.strokeStyle='#1a0804';ctx.lineWidth=2*s;ctx.stroke();
+            ctx.strokeStyle='#8a5a30';ctx.lineWidth=2*s;
+            for(var k2=0;k2<8;k2++){var a2=k2/8*TAU;ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+Math.cos(a2)*r*0.85,wy+Math.sin(a2)*r*0.85);ctx.stroke();}
+            ctx.fillStyle='#c8a878';ctx.beginPath();ctx.arc(wx,wy,r*0.28,0,TAU);ctx.fill();
+            ctx.strokeStyle='#3a2010';ctx.lineWidth=1.2*s;ctx.stroke();
+          }
+        };
+        if(ent.race!=='sylvanid'){drawW2(wheelX1b,wheelY2,wR2);drawW2(wheelX2b,wheelY2,wR2);}
+      }
+      var _isVariantHeroP=(ent.isHero&&(ent.heroType==='inquisitor'||ent.heroType==='shaman'||ent.heroType==='hunter'));
+      if(ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'&&Renderer_&&!_isVariantHeroP){
+        var tempU={role:ent.role,race:ent.race,isHero:ent.isHero,team:ent.team,walkPhase:0,walkOffset:0,moving:false,attackT:0,chopT:0,castT:0,animT:0,x:0,y:0};
+        var pObj={x:cv.width/2,y:dy+dh};
+        var hand=Renderer_._armsCtx(ctx,tempU,pObj,s,false,1);
+        if(hand){
+          ctx.save();ctx.translate(hand.x,hand.y);
+          Renderer_._mainW(ctx,ent.role,ent.race,0,0,0,s);
+          ctx.restore();
+        }
+      }
+      var isOwnEnt=(ent.team===Game_.playerTeam&&ent.pid===Game_.playerPid);
+      var _nameKey2=ent.isHero?('hero_'+(ent.heroType||'paladin')):'';
+      var _nameDisp=ent.isHero?((t_(_nameKey2)!==_nameKey2)?t_(_nameKey2):uName(ent.race,'hero')):uName(ent.race,ent.role);
+      var name=ent.isHero?('⭐ '+_nameDisp):_nameDisp;
+      var extra=ent.isHero?(' Ур.'+ent.level):'';
+      var ownerTag=isOwnEnt?'':' <span style="color:#ff8080">[T'+(ent.team+1)+']</span>';
+      var html='<div class="pname">'+name+extra+ownerTag+'</div>';
+      var hpPct=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpCol=hpPct>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPct>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      html+='<div class="pbar"><div class="fill" style="width:'+hpPct+'%;background:'+hpCol+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      if(ent.maxMana>0){
+        var mpPct=Math.max(0,Math.min(100,Math.round((ent.mana||0)/ent.maxMana*100)));
+        html+='<div class="pbar"><div class="fill" style="width:'+mpPct+'%;background:linear-gradient(90deg,#2a4a9a,#80c0ff)"></div><div class="lbl">MP '+Math.floor(ent.mana||0)+'/'+ent.maxMana+'</div></div>';
+      }
+      if(ent.isHero){
+        var needXP=ent.level*ent.level*30+40;
+        var prevXP=(ent.level-1)*(ent.level-1)*30+40;
+        var xpPct=Math.max(0,Math.min(100,Math.round((ent.exp-prevXP)/(needXP-prevXP)*100)));
+        html+='<div class="pbar"><div class="fill" style="width:'+xpPct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">XP '+xpPct+'%</div></div>';
+      }
+      if(ent._isSummon && ent._summonT>0){
+        var _sumPct=Math.max(0,Math.min(100,Math.round(ent._summonT/(ent.role==='elite'?45:30)*100)));
+        html+='<div class="pbar"><div class="fill" style="width:'+_sumPct+'%;background:linear-gradient(90deg,#8a4a1a,#ffb040)"></div><div class="lbl">Призыв '+Math.ceil(ent._summonT)+'с</div></div>';
+      }
+      var regenHp=(ent.raceRegen||0)+(ent.regenPassive||0);
+      var regenMp=0;
+      if(ent.isHero) regenMp=3;
+      else if(ent.isHealer) regenMp=HEALER_MANA_REGEN;
+      var _hasMagicAura=(Game_&&Game_.auraCache&&Game_.auraCache.manaRegen&&Game_.auraCache.manaRegen[ent.id]);
+      if(_hasMagicAura) regenMp*=1.15;
+      var _mkInl=function(k){return ' <img src="'+toolIconURL(k,10)+'" style="width:10px;height:10px;vertical-align:-2px">';};
+      var _upA=Game_?Game_.getUnitUpgrades(ent.pid,ent.role):{w:0,a:0};
+      var _dmgMul=1+0.15*_upA.w;
+      if(Game_&&Game_.auraCache&&Game_.auraCache.dmg&&Game_.auraCache.dmg[ent.id]) _dmgMul*=1.15;
+      var _finalDmg=Math.round(ent.dmg*_dmgMul);
+      var _bonusDmg=_finalDmg-ent.dmg;
+      var _baseArmor=ent.armor||1;
+      var _effArmor=_baseArmor;
+      if(_upA.a>0) _effArmor=_baseArmor/(1-0.08*_upA.a);
+      var _bonusArmor=_effArmor-_baseArmor;
+      var rows='';
+      if(regenHp>0){rows+='<div class="prow"><span>+HP/с:</span><span class="v">'+regenHp.toFixed(1)+_mkInl('hp')+'</span></div>';}
+      if(regenMp>0){rows+='<div class="prow"><span>+MP/с:</span><span class="v">'+regenMp.toFixed(1)+(_hasMagicAura?' 🜂':'')+_mkInl('mana')+'</span></div>';}
+      rows+='<div class="prow"><span>Урон:</span><span class="v">'+ent.dmg+(_bonusDmg>0?' <span style="color:#7cff5a;font-weight:800">+'+_bonusDmg+'</span>':'')+_mkInl('weapon_melee')+'</span></div>';
+      rows+='<div class="prow"><span>Броня:</span><span class="v">'+_baseArmor.toFixed(2)+(_bonusArmor>0.005?' <span style="color:#7cff5a;font-weight:800">+'+_bonusArmor.toFixed(2)+'</span>':'')+_mkInl('shield')+'</span></div>';
+      var _spdTxt=ent.spd;
+      var _spdBonus=0;
+      if(ent.activeBuffT>0&&(ent.buffType==='rage'||ent.buffType==='speed')) _spdBonus=Math.round(ent.spd*0.3);
+      if(ent.slowT>0&&ent.slowMul<1){
+        var _slowPct=Math.round((1-ent.slowMul)*100);
+        rows+='<div class="prow"><span>Скорость:</span><span class="v">'+_spdTxt+(_spdBonus>0?' <span style="color:#7cff5a;font-weight:800">+'+_spdBonus+'</span>':'')+(_slowPct>0?' <span style="color:#ff8080;font-weight:800">-'+_slowPct+'%</span>':'')+_mkInl('speed')+'</span></div>';
+      } else {
+        rows+='<div class="prow"><span>Скорость:</span><span class="v">'+_spdTxt+(_spdBonus>0?' <span style="color:#7cff5a;font-weight:800">+'+_spdBonus+'</span>':'')+_mkInl('speed')+'</span></div>';
+      }
+      html+=rows;
+      info.innerHTML=html;
+      var _auraList=[];
+      if(ent.invulT>0) _auraList.push({icon:'shield',tip:'Неуязвимость\nНе получает урона и эффектов ('+ent.invulT.toFixed(1)+'с)'});
+      if(ent.stunT>0) _auraList.push({icon:'stop',tip:'Оглушение\nНе может двигаться и атаковать ('+ent.stunT.toFixed(1)+'с)'});
+      if(ent.rootT>0) _auraList.push({icon:'entangle',tip:'Обездвиживание\nНе может двигаться ('+ent.rootT.toFixed(1)+'с)'});
+      if(ent.slowT>0) _auraList.push({icon:'regen',tip:'Замедление\nСкорость ×'+(ent.slowMul||1).toFixed(2)+' ('+ent.slowT.toFixed(1)+'с)'});
+      if(ent.bleedT>0) _auraList.push({icon:'bloodthirst',tip:'Кровотечение / яд\n'+(ent.bleedDmg||0).toFixed(1)+' урона/с ('+ent.bleedT.toFixed(1)+'с)'});
+      if(ent.markedT>0) _auraList.push({icon:'hun_mark',tip:'Метка\n+'+Math.round(((ent.markedBonus||1)-1)*100)+'% урона по цели ('+ent.markedT.toFixed(1)+'с)'});
+      if(ent.holyStrikeBuff) _auraList.push({icon:'holy_strike',tip:'Святой удар\nСледующая атака героя ×1.6'});
+      if(ent.activeBuffT>0){
+        if(ent.buffType==='rage') _auraList.push({icon:'rage',tip:'Ярость\n+30% урона и скорости ('+ent.activeBuffT.toFixed(1)+'с)'});
+        else if(ent.buffType==='speed') _auraList.push({icon:'speed',tip:'Ускорение\n+30% скорости передвижения ('+ent.activeBuffT.toFixed(1)+'с)'});
+      }
+      if(ent.isHero&&ent.bloodthirstHeal>0) _auraList.push({icon:'bloodthirst',tip:'Кровожадность (пассив)\n+'+Math.round(ent.bloodthirstHeal*100)+'% от нанесённого урона в HP'});
+      if(ent.isHero&&ent.regenPassive>0) _auraList.push({icon:'regen',tip:'Регенерация (пассив)\n+'+ent.regenPassive.toFixed(1)+' HP/с'});
+      if(ent.stationed) _auraList.push({icon:'hold',tip:'Стан\nЮнит держит позицию'});
+      if(Game_&&Game_.auraCache){
+        if(Game_.auraCache.blessing&&Game_.auraCache.blessing[ent.id]) _auraList.push({icon:'blessing',tip:'Благословение (герой)\n−10% входящего урона'});
+        if(Game_.auraCache.dmg&&Game_.auraCache.dmg[ent.id]) _auraList.push({icon:'weapon_upg',tip:'Аура кузницы\n+15% урона'});
+        if(Game_.auraCache.manaRegen&&Game_.auraCache.manaRegen[ent.id]) _auraList.push({icon:'mana',tip:'Аура магии\n+15% регенерации маны'});
+      }
+      if(_auraList.length){
+        var _ah='<div class="aura-list" style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;padding-top:3px;border-top:1px solid #3d4c68">';
+        for(var _ai=0;_ai<_auraList.length;_ai++){
+          var _a=_auraList[_ai];
+          _ah+='<div class="aura-badge" data-tip="'+String(_a.tip).replace(/"/g,'&quot;')+'" style="width:16px;height:16px;border:1px solid #c8a040;border-radius:2px;background:#0a101c;overflow:hidden;cursor:help;flex-shrink:0"><img src="'+toolIconURL(_a.icon,16)+'" style="width:14px;height:14px;display:block;margin:1px" draggable="false"></div>';
+        }
+        _ah+='</div>';
+        info.innerHTML+=_ah;
+        var _badges=info.querySelectorAll('.aura-badge');
+        for(var _bi=0;_bi<_badges.length;_bi++){
+          (function(bd){
+            bd.onmouseenter=function(){UI._showWc3Tooltip(bd,bd.dataset.tip);};
+            bd.onmouseleave=function(){UI._hideWc3Tooltip();};
+            bd.addEventListener('touchstart',function(e){e.stopPropagation();UI._showWc3Tooltip(bd,bd.dataset.tip);},{passive:true});
+          })(_badges[_bi]);
+        }
+      }
+    } else if(ent.isCreep){
+      var spC=bakeCreep(ent.kind,0,ent.isBoss);
+      var sC=Math.min((cv.width-16)/spC.width,(cv.height-16)/spC.height);
+      ctx.drawImage(spC,(cv.width-spC.width*sC)/2,(cv.height-spC.height*sC)/2,spC.width*sC,spC.height*sC);
+      var hpPctC=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpColC=hpPctC>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPctC>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      var creepName=getCreepName(ent.kind);
+      var htmlC='<div class="pname">'+creepName+' Lv.'+ent.level+(ent.isBoss?' <span style="color:#ffd000">BOSS</span>':'')+'</div>';
+      htmlC+='<div class="pbar"><div class="fill" style="width:'+hpPctC+'%;background:'+hpColC+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      htmlC+='<div class="prow"><span>Урон:</span><span class="v">'+ent.dmg+'</span></div>';
+      htmlC+='<div class="prow"><span>Броня:</span><span class="v">'+(ent.armor||1).toFixed(2)+'</span></div>';
+      htmlC+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.range+'</span></div>';
+      htmlC+='<div class="prow"><span>Награда:</span><span class="v">'+ent.goldReward+'</span></div>';
+      info.innerHTML=htmlC;
+    } else {
+      var sp2=bakeBuilding(ent.race,ent.kind,ent.team,ent.towerUpgrade);
+      var _padP=(ent.kind==='tower'&&ent.towerUpgrade)?8:16;
+      var s2=Math.min((cv.width-_padP)/sp2.width,(cv.height-_padP)/sp2.height);
+      ctx.drawImage(sp2,(cv.width-sp2.width*s2)/2,(cv.height-sp2.height*s2)/2,sp2.width*s2,sp2.height*s2);
+      var hpPctB=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+      var hpColB=hpPctB>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPctB>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+      var ownerTag2=(ent.team===Game_.playerTeam&&ent.pid===Game_.playerPid)?'':' <span style="color:#ff8080">[T'+(ent.team+1)+']</span>';
+      var towerUpTag='';
+      if(ent.kind==='tower'&&ent.towerUpgrade){
+        var tuInfoB=TOWER_UPGRADES[ent.race]&&TOWER_UPGRADES[ent.race][ent.towerUpgrade];
+        towerUpTag=' <span style="color:#a0c0ff;font-size:9px">('+(tuInfoB?(LC==='en'?tuInfoB.nameEn:tuInfoB.name):'')+')</span>';
+      }
+      var htmlB='<div class="pname">'+bldName(ent.race,ent.kind)+towerUpTag+ownerTag2+'</div>';
+      htmlB+='<div class="pbar"><div class="fill" style="width:'+hpPctB+'%;background:'+hpColB+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
+      if(!ent.completed){
+        var bpPct=Math.max(0,Math.min(100,Math.round(ent.buildProgress/ent.buildTime*100)));
+        htmlB+='<div class="pbar"><div class="fill" style="width:'+bpPct+'%;background:linear-gradient(90deg,#8a6a1a,#e6c67a)"></div><div class="lbl">Стройка '+bpPct+'%</div></div>';
+      } else if(ent.atk){
+        htmlB+='<div class="prow"><span>Урон:</span><span class="v">'+ent.atk+'</span></div>';
+        htmlB+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.rng+'</span></div>';
+      } else if(ent.pop){
+        htmlB+='<div class="prow"><span>Еда:</span><span class="v">+'+ent.pop+'</span></div>';
+      }
+      if(ent.level>1) htmlB+='<div class="prow"><span>Уровень:</span><span class="v">'+ent.level+'</span></div>';
+      info.innerHTML=htmlB;
+    }
+  }catch(e){ERR('drawPortrait',e);}
+};
+UISys.prototype.drawMinePortrait=function(res,workersList){
+  var cv=this.$('portrait-canvas'),info=this.$('portrait-info');
+  if(!cv) return;
+  var ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var bgGrad=ctx.createLinearGradient(0,0,0,cv.height);
+  bgGrad.addColorStop(0,'#1a2438');bgGrad.addColorStop(1,'#050810');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,cv.width,cv.height);
+  var sp=bakeResource(res.kind);
+  var s=Math.min((cv.width-16)/sp.width,(cv.height-16)/sp.height);
+  ctx.drawImage(sp,(cv.width-sp.width*s)/2,(cv.height-sp.height*s)/2,sp.width*s,sp.height*s);
+  var pct=Math.max(0,Math.min(100,Math.round(res.amount/res.maxAmount*100)));
+  var html='<div class="pname">'+(res.kind==='gold'?t_('goldMine'):t_('treeRes'))+'</div>';
+  html+='<div class="pbar"><div class="fill" style="width:'+pct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">'+Math.floor(res.amount)+'</div></div>';
+  html+='<div class="prow"><span>Рабочих:</span><span class="v">'+workersList.length+'</span></div>';
+  if(res.kind==='gold'){
+    var inCnt=0,waitCnt=0;
+    for(var i=0;i<workersList.length;i++){if(workersList[i]._insideMine) inCnt++;else if(workersList[i]._waitingForMine) waitCnt++;}
+    html+='<div class="prow"><span>Внутри:</span><span class="v">'+inCnt+'/'+MAX_GATHER_PER_MINE+'</span></div>';
+    html+='<div class="prow"><span>В очереди:</span><span class="v">'+waitCnt+'</span></div>';
+  }
+  info.innerHTML=html;
+};
+UISys.prototype._refreshPortraitBars=function(){
+  if(!Game_) return;
+  var g=Game_,ent=null;
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.sel&&u.pid===g.playerPid&&!u.dying){ent=u;break;}
+  }
+  if(!ent&&this._inspectEnt) ent=this._inspectEnt;
+  if(!ent){for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid){ent=b;break;}}}
+  if(!ent) return;
+  var info=this.$('portrait-info');if(!info) return;
+  var _auraHash='';
+  if(ent&&ent.isUnit){
+    if(ent.invulT>0)_auraHash+='I';
+    if(ent.stunT>0)_auraHash+='S';
+    if(ent.rootT>0)_auraHash+='R';
+    if(ent.slowT>0)_auraHash+='W';
+    if(ent.bleedT>0)_auraHash+='B';
+    if(ent.markedT>0)_auraHash+='M';
+    if(ent.holyStrikeBuff)_auraHash+='H';
+    if(ent.activeBuffT>0)_auraHash+=(ent.buffType||'X');
+    if(ent.isHero&&ent.bloodthirstHeal>0)_auraHash+='b';
+    if(ent.isHero&&ent.regenPassive>0)_auraHash+='r';
+    if(ent.stationed)_auraHash+='S_';
+    if(g.auraCache){
+      if(g.auraCache.blessing&&g.auraCache.blessing[ent.id])_auraHash+='L';
+      if(g.auraCache.dmg&&g.auraCache.dmg[ent.id])_auraHash+='D';
+      if(g.auraCache.manaRegen&&g.auraCache.manaRegen[ent.id])_auraHash+='A';
+    }
+    // ПАТЧ F: прокачка оружия/брони + уровень героя триггерят перерисовку
+    var _up=Game_.getUnitUpgrades(ent.pid,ent.role);
+    _auraHash+='|w'+_up.w+'a'+_up.a+'|L'+ent.level+'|d'+Math.round(ent.dmg);
+  }
+  if(this._lastPortraitAuraHash!==_auraHash){
+    this._lastPortraitAuraHash=_auraHash;
+    this.drawPortrait(ent);
+    return;
+  }
+  var bars=info.querySelectorAll('.pbar');
+  if(!bars.length) return;
+  if(bars[0]){
+    var hpPct=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
+    var hpFill=bars[0].querySelector('.fill');
+    var hpLbl=bars[0].querySelector('.lbl');
+    if(hpFill) hpFill.style.width=hpPct+'%';
+    if(hpLbl) hpLbl.textContent='HP '+Math.ceil(ent.hp)+'/'+ent.maxHp;
+    var hpCol=hpPct>50?'linear-gradient(90deg,#2a8a2a,#5adf5a)':hpPct>25?'linear-gradient(90deg,#8a6a1a,#e6c67a)':'linear-gradient(90deg,#8a1010,#ff6060)';
+    if(hpFill) hpFill.style.background=hpCol;
+  }
+  if(ent.maxMana>0&&bars[1]){
+    var mpPct=Math.max(0,Math.min(100,Math.round((ent.mana||0)/ent.maxMana*100)));
+    var mpFill=bars[1].querySelector('.fill');
+    var mpLbl=bars[1].querySelector('.lbl');
+    if(mpFill) mpFill.style.width=mpPct+'%';
+    if(mpLbl) mpLbl.textContent='MP '+Math.floor(ent.mana||0)+'/'+ent.maxMana;
+  }
+  if(ent.isHero){
+    var xpBarIdx=ent.maxMana>0?2:1;
+    if(bars[xpBarIdx]){
+      var needXP=ent.level*ent.level*30+40;
+      var prevXP=(ent.level-1)*(ent.level-1)*30+40;
+      var xpPct2=Math.max(0,Math.min(100,Math.round((ent.exp-prevXP)/(needXP-prevXP)*100)));
+      var xpFill=bars[xpBarIdx].querySelector('.fill');
+      var xpLbl=bars[xpBarIdx].querySelector('.lbl');
+      if(xpFill) xpFill.style.width=xpPct2+'%';
+      if(xpLbl) xpLbl.textContent='XP '+xpPct2+'%';
+    }
+  }
+};
+
+      UISys.prototype.addAction=function(box,icon,label,price,fn,active,disabled,tooltip,cls){
+  var btn=document.createElement('button');
+  btn.className='act-btn'+(active?' active':'')+(cls?' '+cls:'');
+  if(disabled) btn.disabled=true;
+  var html='';
+  if(icon) html+='<div class="ico">'+icon+'</div>';
+  html+='<div class="lbl">'+label+'</div>';
+  if(price) html+='<div class="price">'+price+'</div>';
+  btn.innerHTML=html;
+  btn.onclick=function(){if(disabled) return;Audio.sfx('click');fn();};
+  if(tooltip){
+    btn.setAttribute('data-tip',tooltip);
+    if(!Settings._isMobile){
+      btn.addEventListener('mouseenter',function(){UI._showWc3Tooltip(btn,tooltip);});
+      btn.addEventListener('mouseleave',function(){UI._hideWc3Tooltip();});
+    }
+  }
+  if(tooltip && Settings._isMobile){
+    (function(tipText){
+      var tipTimer=null;
+      btn.addEventListener('touchstart',function(e){
+        tipTimer=setTimeout(function(){
+          var mt=document.getElementById('mobile-tip');
+          if(!mt) return;
+          mt.textContent=tipText;
+          var r=btn.getBoundingClientRect();
+          var tw=Math.min(window.innerWidth*0.85,280);
+          var tx=r.left+r.width/2-tw/2;
+          if(tx<8) tx=8;
+          if(tx+tw>window.innerWidth-8) tx=window.innerWidth-tw-8;
+          mt.style.width=tw+'px';
+          mt.style.left=tx+'px';
+          mt.style.top='';
+          mt.style.bottom='20px';
+          mt.classList.add('show');
+          if(navigator.vibrate) navigator.vibrate(15);
+        },650);
+      },{passive:true});
+      btn.addEventListener('touchend',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+      btn.addEventListener('touchmove',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+      btn.addEventListener('touchcancel',function(){ if(tipTimer){clearTimeout(tipTimer);tipTimer=null;} });
+    })(tooltip);
+  }
+  box.appendChild(btn);return btn;
+};
+UISys.prototype.getActionsHash=function(){
+  if(!Game_) return '';
+  var g=Game_,parts=[];
+  var _hasSel=false;
+  var _addRes=function(){if(_hasSel)return;_hasSel=true;var _r=g.getRes(g.playerPid);parts.push('r|'+Math.floor(_r.gold/10)+'|'+Math.floor(_r.wood/10)+'|'+_r.food+'|'+_r.maxFood);};
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.sel&&u.pid===g.playerPid&&!u.dying){
+      _addRes();
+      parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+(u.ultUnlocked?1:0)+'|'+(u.isHero?('L'+JSON.stringify(u.abilityLevels||{})):''));
+    }
+  }
+  for(var bi=0;bi<g.buildings.length;bi++){
+    var b=g.buildings[bi];
+    if(b.sel&&b.pid===g.playerPid){
+      _addRes();
+      var q='';for(var qi=0;qi<b.queue.length;qi++) q+=b.queue[qi].role.charAt(0);
+      parts.push('b'+b.id+'|'+b.kind+'|'+b.queue.length+'|'+q+'|'+(b.upgrading?1:0)+'|'+b.level+'|'+(b.techUpgrading?(b.techUpgrading.role+'.'+b.techUpgrading.stat):'')+'|'+(b.completed?1:0)+'|'+(b.rallyPoint?('R'):'')+'|'+(b.sawmillLevel||0)+'|'+(b.sawmillUpgrading?1:0)+'|'+(b.reviveQueue&&b.reviveQueue.length?1:0)+'|'+(b.towerUpgrade||'')+'|'+(b._pendingUpgrade||'')+'|'+(b._towerUpgrading?1:0));
+    }
+  }
+  if(!_hasSel) return '';
+  return parts.join(';');
+};
+UISys.prototype.costStr=function(g,w){
+  var s='';
+  if(g) s+='<div>'+g+toolIconImg('gold')+'</div>';
+  if(w) s+='<div>'+w+toolIconImg('wood')+'</div>';
+  return s;
+};
+UISys.prototype.foodStr=function(role){
+  var f=FOOD_COST[role]||1;
+  return '<div>'+f+toolIconImg('meat')+'</div>';
+};
+UISys.prototype.canPlaceAt=function(x,y,def){
+  if(!Game_) return false;
+  var g=Game_,size=(def.size||3)*22;
+  if(x<size||y<size||x>g.W-size||y>g.H-size) return false;
+  for(var i=0;i<g.buildings.length;i++){var ob=g.buildings[i],dx=ob.x-x,dy=ob.y-y,rr=ob.radius+size+40;if(dx*dx+dy*dy<rr*rr) return false;}
+  for(i=0;i<g.resources.length;i++){var r=g.resources[i];if(r.dead) continue;var dx2=r.x-x,dy2=r.y-y,rr2=r.radius+size-6;if(dx2*dx2+dy2*dy2<rr2*rr2) return false;}
+  if(def.kind==='townhall'){
+    var thCount=0;
+    for(var ti=0;ti<g.buildings.length;ti++){
+      var tb=g.buildings[ti];
+      if(tb.pid===g.playerPid&&tb.kind==='townhall'&&!tb.dead&&tb.completed) thCount++;
+    }
+    if(thCount>=MAX_TH_PER_PLAYER) return false;
+    return true;
+  }
+  for(i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.pid!==g.playerPid) continue;if(Math.hypot(b.x-x,b.y-y)<700) return true;}
+  return false;
+};
+UISys.prototype.tryPlaceAt=function(x,y){
+  if(!this._placingKind||!Game_) return;
+  var g=Game_,kind=this._placingKind,race=this._placingRace;
+  if(!race){this.cancelPlacement();return;}
+  var def=RACES[race].buildings[kind];if(!def){this.cancelPlacement();return;}
+  if(!this.canPlaceAt(x,y,def)){g.notify(t_('cantBuild'));return;}
+  var res=g.getRes(g.playerPid);
+  if(res.gold<def.gold){g.notify(t_('nGold'));this.cancelPlacement();return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));this.cancelPlacement();return;}
+  var w=null;
+  for(var i2=0;i2<g.units.length;i2++){var u2=g.units[i2];if(u2.sel&&u2.pid===g.playerPid&&u2.role==='worker'&&!u2.dying){w=u2;break;}}
+  if(!w){for(var i3=0;i3<g.units.length;i3++){var u3=g.units[i3];if(u3.pid===g.playerPid&&u3.role==='worker'&&!u3.dying&&!u3.buildTarget&&!u3.repairTarget){w=u3;break;}}}
+  if(!w){g.notify(t_('noWorker'));this.cancelPlacement();return;}
+  var newRad=(def.size||3)*22+24;
+  for(var mv=0;mv<g.units.length;mv++){
+    var mu=g.units[mv];
+    if(mu.pid!==g.playerPid||mu.dying) continue;
+    var mdx=mu.x-x,mdy=mu.y-y,md=Math.hypot(mdx,mdy);
+    if(md<newRad){
+      var mvAng=md>0.01?Math.atan2(mdy,mdx):Math.random()*TAU;
+      mu.moveTo={x:g.clampX(x+Math.cos(mvAng)*(newRad+50)),y:g.clampY(y+Math.sin(mvAng)*(newRad+50))};
+      mu._path=null;mu._pathIdx=0;
+    }
+  }
+  g.subRes(g.playerPid,def.gold,def.wood);
+  var b=new Building(x,y,g.playerTeam,def,race);
+  b.completed=false;b.buildProgress=0;b.owner='player';b.pid=g.playerPid;
+  g.buildings.push(b);g.navDirty=true;
+  w.buildTarget=b;w.gatherTarget=null;w.moveTo=null;w.repairTarget=null;w.demolishTarget=null;w.carrying=null;w.carryAmt=0;w.target=null;w.lockedTarget=null;w.gatherAnimT=0;w.attackMoveTo=null;w.patrolRoute=null;w._stuckTimer=0;w._insideMine=false;w._mineSlot=-1;w._waitingForMine=false;w._path=null;w._pathIdx=0;
+  w.stationed=false;
+  for(var _clr=0;_clr<g.units.length;_clr++){
+    var _cu=g.units[_clr];
+    if(_cu.pid!==g.playerPid||_cu.dying||_cu===w) continue;
+    var _cuInB=false;
+    if(_cu.moveTo&&Math.hypot(_cu.moveTo.x-x,_cu.moveTo.y-y)<newRad*1.1) _cuInB=true;
+    if(_cu.attackMoveTo&&Math.hypot(_cu.attackMoveTo.x-x,_cu.attackMoveTo.y-y)<newRad*1.1) _cuInB=true;
+    if(_cuInB){
+      _cu.moveTo=null;_cu.attackMoveTo=null;_cu.patrolRoute=null;_cu._path=null;_cu._pathIdx=0;
+    }
+  }
+  Audio.sfx('build');this.cancelPlacement();
+};
+UISys.prototype.demolish=function(b){
+  var g=Game_;if(!g||!b||b.kind==='townhall') return;
+  var w=null;
+  for(var ui=0;ui<g.units.length;ui++){var u=g.units[ui];if(u.pid===g.playerPid&&u.role==='worker'&&!u.dying){w=u;break;}}
+  if(!w){g.notify(t_('noWorker'));return;}
+  w.demolishTarget=b;w.buildTarget=null;w.repairTarget=null;w.gatherTarget=null;w._insideMine=false;w._mineSlot=-1;w._waitingForMine=false;
+  this.refreshSelection();
+};
+UISys.prototype.cancelConstruction=function(b){
+  var g=Game_;if(!g||!b) return;
+  g.addRes(g.playerPid,b.costGold||0,b.costWood||0);
+  if(b.queue&&b.queue.length){
+    for(var qi=0;qi<b.queue.length;qi++){
+      var q=b.queue[qi];
+      var raceDef=RACES[q.race||b.race],qDef=raceDef&&raceDef.units[q.role];
+      if(q.role==='hero'&&q.heroType){var hv=getHeroVariant(q.race||b.race,q.heroType);if(hv) qDef=hv;}
+      if(qDef) g.addRes(g.playerPid,qDef.gold||0,qDef.wood||0);
+    }
+    b.queue=[];
+  }
+  if(b.reviveQueue&&b.reviveQueue.length){
+    for(var ri=0;ri<b.reviveQueue.length;ri++){
+      var rq=b.reviveQueue[ri];
+      var rd=rq.reviveData||{};
+      var hv2=getHeroVariant(rd.race||b.race,rq.heroType||'paladin');
+      if(hv2) g.addRes(g.playerPid,hv2.gold||0,hv2.wood||0);
+    }
+    b.reviveQueue=[];
+  }
+  for(var i=0;i<g.units.length;i++){
+    var u=g.units[i];
+    if(u.pid!==g.playerPid||u.dying) continue;
+    if(u.buildTarget===b){
+      u.buildTarget=null;
+      u._path=null;u._pathIdx=0;
+      u.moving=false;
+      u.gatherAnimT=0;u.chopT=0;
+    }
+  }
+  b.dead=true;
+  g.navDirty=true;
+  g.floaters.push(new Floater(b.x,b.y-40,'Отменено','#ffe9a8'));
+  Audio.sfx('click');
+  this.refreshSelection();
+};
+UISys.prototype.upgradeTH=function(b){
+  var g=Game_;if(!g||!b||b.upgrading||b.level>=3) return;
+  if(b.queue&&b.queue.length>0){g.notify('Сначала дождитесь окончания найма');return;}
+  var cost=TH_UPG[b.level];if(!cost) return;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold||res.wood<cost.wood){g.notify(t_('nGold'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);b.upgrading=true;b.upgradeTimeLeft=cost.time;
+  Audio.sfx('upgrade',b.x,b.y);this.renderActions(true);
+};
+UISys.prototype.upgradeUnit=function(role,stat){
+  var g=Game_;if(!g) return;
+  var up=g.getUnitUpgrades(g.playerPid,role);if(up[stat]>=3) return;
+  var cost=UPGRADE_COST[up[stat]],res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<cost.wood){g.notify(t_('nWood'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);up[stat]++;Audio.sfx('upgrade');this.renderActions(true);
+};
+
+      UISys.prototype.queueUnit=function(b,role){
+  var g=Game_;if(!g||!b) return;
+  if(b.kind==='forge'&&b.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  if(b.kind==='townhall'&&b.upgrading){g.notify('Идёт улучшение ратуши');return;}
+  var race=RACES[b.race];if(!race) return;
+  var def=race.units[role];if(!def) return;
+  var _hTypeArg=arguments[2];
+  if(role==='hero'&&_hTypeArg){
+    var _hvQ=getHeroVariant(b.race,_hTypeArg);
+    if(_hvQ) def=_hvQ;
+  }
+  var _nonSummon=0;
+  for(var _nsi=0;_nsi<g.units.length;_nsi++) if(!g.units[_nsi]._isSummon) _nonSummon++;
+  var _queuedCount=0;
+  for(var _qbi=0;_qbi<g.buildings.length;_qbi++){
+    var _qb=g.buildings[_qbi];
+    if(_qb.pid!==g.playerPid||_qb.dead) continue;
+    _queuedCount+=_qb.queue.length;
+  }
+  if(_nonSummon+_queuedCount>=300){
+    g.notify('Лимит юнитов (300) — найм невозможен');
+    return;
+  }
+  var res=g.getRes(g.playerPid),reserved=g.getReservedPop(g.playerPid);
+  if(b.queue.length>=10){g.notify(t_('queueFull'));return;}
+  if(res.gold<def.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));return;}
+  var foodCost=FOOD_COST[role]||1;
+  if((res.food+reserved+foodCost)>res.maxFood){g.notify(t_('needHouse'));return;}
+  if(role==='hero'){
+    var _wantHT=_hTypeArg||(b.race==='luminite'?'paladin':b.race==='gromborn'?'warchief':'archdruid');
+    var _alive=0;
+    for(var _hi=0;_hi<g.units.length;_hi++){var _hu=g.units[_hi];if(_hu.isHero&&_hu.pid===g.playerPid&&!_hu.dying&&_hu.heroType===_wantHT) _alive++;}
+    if(_alive>=1){g.notify(t_('heroExists'));return;}
+    var _inQ=false;
+    for(var _hq=0;_hq<g.buildings.length;_hq++){
+      var _hqb=g.buildings[_hq];
+      if(_hqb.pid!==g.playerPid||_hqb.dead) continue;
+      for(var _qqi=0;_qqi<_hqb.queue.length;_qqi++){if(_hqb.queue[_qqi].role==='hero'&&_hqb.queue[_qqi].heroType===_wantHT){_inQ=true;break;}}
+      if(_hqb.reviveQueue&&_hqb.reviveQueue.length>0){for(var _rqi=0;_rqi<_hqb.reviveQueue.length;_rqi++){if(_hqb.reviveQueue[_rqi].reviveData&&_hqb.reviveQueue[_rqi].reviveData.heroType===_wantHT){_inQ=true;break;}}}
+      if(_inQ) break;
+    }
+    if(_inQ){g.notify(t_('heroExists'));return;}
+    if(g.deadHeroes&&g.deadHeroes[g.playerPid+'_'+_wantHT]){g.notify('Используйте Воскресить');return;}
+    g.subRes(g.playerPid,def.gold,def.wood);
+    b.queue.push({role:'hero',heroType:_wantHT,race:b.race,timeLeft:def.time,timeTotal:def.time});
+    Audio.sfx('click');this.renderActions(true);
+    return;
+  }
+  g.subRes(g.playerPid,def.gold,def.wood);
+  b.queue.push({role:role,race:b.race,timeLeft:def.time,timeTotal:def.time});
+  Audio.sfx('click');this.renderActions(true);
+};
+UISys.prototype.startForgeUpgrade=function(b,role,stat){
+  var g=Game_;if(!g||!b||b.kind!=='forge') return;
+  if(b.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  if(b.queue.length>0){g.notify('Идёт найм войск — дождитесь окончания');return;}
+  for(var fi=0;fi<g.buildings.length;fi++){
+    var fb=g.buildings[fi];
+    if(fb.dead||fb.pid!==g.playerPid||fb.kind!=='forge') continue;
+    if(fb.techUpgrading){g.notify(t_('forgeBusy'));return;}
+  }
+  var up=g.getUnitUpgrades(g.playerPid,role);if(up[stat]>=3) return;
+  var cost=UPGRADE_COST[up[stat]],res=g.getRes(g.playerPid);
+  if(res.gold<cost.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<cost.wood){g.notify(t_('nWood'));return;}
+  g.subRes(g.playerPid,cost.gold,cost.wood);
+  var tTime=FORGE_UPG_TIME[up[stat]]||30;
+  b.techUpgrading={role:role,stat:stat,timeLeft:tTime,timeTotal:tTime};
+  Audio.sfx('click');
+  this.renderActions(true);
+};
+UISys.prototype.resurrectHero=function(b,heroType){
+  var g=Game_;if(!g||!b) return;
+  heroType=heroType||'paladin';
+  var _aliveHT=0;
+  for(var _ai=0;_ai<g.units.length;_ai++){var _au=g.units[_ai];if(_au.isHero&&_au.pid===g.playerPid&&!_au.dying&&_au.heroType===heroType) _aliveHT++;}
+  if(_aliveHT>=1){g.notify(t_('heroExists'));return;}
+  var _dk=g.playerPid+'_'+heroType;
+  var dh=g.deadHeroes?g.deadHeroes[_dk]:null;
+  if(!dh) return;
+  var raceDef=RACES[dh.race];if(!raceDef) return;
+  var hv=getHeroVariant(dh.race,heroType);if(!hv) return;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<hv.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<hv.wood){g.notify(t_('nWood'));return;}
+  if(!b.reviveQueue) b.reviveQueue=[];
+  for(var _rqi=0;_rqi<b.reviveQueue.length;_rqi++){if(b.reviveQueue[_rqi].reviveData&&b.reviveQueue[_rqi].reviveData.heroType===heroType){g.notify('Воскрешение уже идёт');return;}}
+  g.subRes(g.playerPid,hv.gold,hv.wood);
+  var time=25+2*(dh.level||1);
+  b.reviveQueue.push({role:'hero',heroType:heroType,race:dh.race,timeLeft:time,timeTotal:time,reviveData:dh});
+  Audio.sfx('hero');
+  this.renderActions(true);
+};
+UISys.prototype.cancelTowerUpgrade=function(b){
+  var g=Game_;
+  if(!g||!b||!b._towerUpgrading) return;
+  var tuId=b._pendingUpgrade;
+  var tuDef=tuId?(TOWER_UPGRADES[b.race]&&TOWER_UPGRADES[b.race][tuId]):null;
+  if(tuDef){
+    var refundR=0.5;
+    g.addRes(g.playerPid,Math.floor(tuDef.cost.gold*refundR),Math.floor(tuDef.cost.wood*refundR));
+    g.floaters.push(new Floater(b.x,b.y-60,'+'+Math.floor(tuDef.cost.gold*refundR)+' зол.','#a0ffa0'));
+  } else {
+    g.floaters.push(new Floater(b.x,b.y-60,'Отменено','#ffe9a8'));
+  }
+  b._towerUpgrading=false;
+  b._pendingUpgrade=null;
+  b._towerUpgradeTimeLeft=0;
+  b._towerUpgradeTotal=0;
+  Audio.sfx('click');
+  this.renderActions(true);
+};
+UISys.prototype.showBuildMenu=function(){
+  var box=this.$('actions');
+  box.innerHTML='';box.dataset.menu='build';
+  if(!Game_) return;
+  var g=Game_,self=this,race=null;
+  for(var i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+  if(!race) return;
+  var rdef=RACES[race],thLvl=g.getTHLevel(g.playerPid),list=BUILDING_UNLOCK[thLvl]||BUILDING_UNLOCK[1];
+  for(var k=0;k<list.length;k++){
+    (function(kind){
+      var def=rdef.buildings[kind];if(!def) return;
+      var btip=bldName(race,kind)+'\nЗолото: '+def.gold+'\nДерево: '+def.wood+'\nHP: '+def.hp+'\n'+t_('d_'+kind);
+      self.addAction(box,buildingIconImg(race,kind),bldName(race,kind),self.costStr(def.gold,def.wood),function(){self.startPlacement(kind);},false,false,btip);
+    })(list[k]);
+  }
+  var back=document.createElement('button');
+  back.className='act-btn';
+  back.innerHTML='<div class="ico">'+toolIconImg('cancel')+'</div><div class="lbl">'+t_('back')+'</div>';
+  back.onclick=function(){Audio.sfx('click');box.dataset.menu='';self.renderActions(true);};
+  box.appendChild(back);
+};
+UISys.prototype.startPlacement=function(kind){
+  if(!Game_) return;
+  var g=Game_,race=null;
+  for(var i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+  if(!race) return;
+  var def=RACES[race].buildings[kind];if(!def) return;
+  var res=g.getRes(g.playerPid);
+  if(res.gold<def.gold){g.notify(t_('nGold'));return;}
+  if(res.wood<def.wood){g.notify(t_('nWood'));return;}
+  this._placingKind=kind;this._placingRace=race;
+  this.$('place-name').textContent=bldName(race,kind);
+  this.$('placement-bar').classList.add('show');
+  var box=this.$('actions');
+  box.innerHTML='';
+  var cancel=document.createElement('button');
+  cancel.className='act-btn';
+  cancel.innerHTML='<div class="ico">'+toolIconImg('cancel')+'</div><div class="lbl">'+t_('cancel')+'</div>';
+  cancel.onclick=function(){Audio.sfx('click');UI.cancelPlacement();};
+  box.appendChild(cancel);box.dataset.menu='placing';
+};
+UISys.prototype.cancelPlacement=function(){
+  this._placingKind=null;this._placingRace=null;
+  var bar=this.$('placement-bar');if(bar) bar.classList.remove('show');
+  var box=this.$('actions');
+  if(box&&box.dataset.menu==='placing'){box.dataset.menu='';this.renderActions(true);}
+};
+UISys.prototype.renderActions=function(force){
+  if(!Game_) return;
+  var box=this.$('actions');
+  if(!force&&(box.dataset.menu==='build'||box.dataset.menu==='placing')) return;
+  box.innerHTML='';box.dataset.menu='';
+  this._abilityButtons=[];
+  var g=Game_,sel=[],selB=[];
+  for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
+  for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
+  var self=this;
+  var activeU=null;
+  for(var _ak=0;_ak<sel.length;_ak++){ if(sel[_ak].id===this._activeUnitId){activeU=sel[_ak];break;} }
+  if(!activeU && sel.length) activeU=sel[0];
+  if(activeU&&activeU.isHero){
+    var hero=activeU,abils=hero.heroAbilities;
+    var _stunnedHero=(hero.stunT>0||hero.rootT>0);
+    var manaDiv=document.createElement('div');
+    manaDiv.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:4px 6px;background:#0d1420;border:1px solid #3d4c68;border-radius:5px;margin-bottom:4px';
+    var curMana=hero.mana||0,maxMana=Math.max(1,hero.maxMana||100);
+    var manaFillPct=Math.round((curMana/maxMana)*100);
+    var needXP=(hero.level*hero.level*30+40);
+    var prevXP=(hero.level-1)*(hero.level-1)*30+40;
+    var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
+    manaDiv.innerHTML='<span style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div><span style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
+    box.appendChild(manaDiv);
+    if(_stunnedHero){
+      var _stunBar=document.createElement('div');
+      _stunBar.style.cssText='grid-column:1/-1;padding:4px 6px;background:rgba(120,30,30,0.5);border:1px solid #a04040;border-radius:5px;margin-bottom:4px;color:#ffd0d0;font-size:11px;font-weight:700;text-align:center';
+      _stunBar.textContent='ОГЛУШЁН / ОБЕЗДВИЖЕН — способности недоступны ('+Math.max(hero.stunT||0,hero.rootT||0).toFixed(1)+'с)';
+      box.appendChild(_stunBar);
+    }
+    for(var ai=0;ai<abils.length;ai++){
+      (function(ab,abIdx){
+        var lvl=hero.abilityLevels[ab.id]||0;
+        var cd=0;
+        if(ab.type==='passive') cd=0;
+        else if(abIdx===0) cd=hero.cdA1;
+        else if(abIdx===1) cd=hero.cdA2;
+        else if(abIdx===2) cd=hero.cdA3;
+        else if(ab.type==='ultimate') cd=hero.cdUlt;
+        var isPassive=(ab.type==='passive');
+        var canLvlUp=false;
+        if(hero.skillPoints>0&&lvl<3){
+          if(ab.type==='ultimate'){
+            var _needLvl=6+lvl*2;
+            canLvlUp=(hero.level>=_needLvl);
+          } else canLvlUp=true;
+        }
+        var hasMana=(curMana)>=(ab.mana||0);
+        var canUse=!isPassive&&lvl>0&&cd<=0&&(ab.type!=='ultimate'||hero.ultUnlocked)&&hasMana&&!_stunnedHero;
+        var btnDisabled=!(canLvlUp||canUse);
+        var key=abIdx===0?'[Q] ':abIdx===1?'[W] ':ab.type==='ultimate'?'[R] ':'[E] ';
+        var label=key+t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
+        if(ab.type==='ultimate'){
+          if(!hero.ultUnlocked) label+=' (X)';
+          else if(lvl<3&&!canLvlUp){label+=' (ур.'+(6+lvl*2)+')';}
+        }
+        if(canLvlUp) label+=' +';
+        var price='';
+        if(cd>0) price+=Math.ceil(cd)+'с';
+        if(!isPassive) price+= (price?' ':'')+(ab.mana||35)+'маны';
+        var iconName=ab.id;
+        if(iconName==='divine_shield') iconName='shield';
+        if(iconName==='forest_wrath') iconName='forest';
+        if(iconName==='hun_moonarrow') iconName='hun_arrow';
+        var tip=t_('ability_'+ab.id);
+        if(tip==='ability_'+ab.id) tip=ab.id;
+        tip+='\n\n'+(isPassive?'Пассивная. ':'')+'Shift+клик — улучшить до '+(lvl+1)+'/3';
+        if(ab.type==='ultimate'){
+          if(!hero.ultUnlocked) tip='Ультимейт откроется на 6 ур.';
+          else if(lvl<3){
+            var _needNext=6+lvl*2;
+            if(hero.level<_needNext) tip+='\n\nСледующий уровень ульта: '+_needNext+' ур. героя (сейчас '+hero.level+').';
+            else tip+='\n\nМожно улучшить сейчас! Ульт улучшается на 6 / 8 / 10 уровнях.';
+          }
+        }
+        if(ab.type!=='passive') tip+='\nМана: '+(ab.mana||35)+' · Кулдаун: '+ab.cd+'с';
+        if(ab.targeted) tip+='\nНаводимая: кликните по цели';
+        if(_stunnedHero) tip+='\n\n⚠ ОГЛУШЁН — каст невозможен';
+        var _btnCls='ability'+(canLvlUp?' can-level':'');
+        var _btn=self.addAction(box,toolIconImg(iconName,48),label,price,function(){
+          var shift=!!Input.shiftDown;
+          if(canLvlUp&&(shift||!canUse)){hero.abilityLevels[ab.id]=lvl+1;hero.skillPoints--;hero._recalc();self.renderActions(true);}
+          else if(canUse){
+            if(ab.targeted){
+              Input.clearPending('ability');
+              Input.pendingTargetedAbility={hero:hero,ab:ab};
+              var _abShort=t_(ab.k);
+              if(_abShort===ab.k) _abShort=(t_('ability_'+ab.id).split(':')[0]||ab.id);
+              self.showOrderBar(_abShort+': выберите цель');
+              Audio.sfx('click');
+            } else {
+              g.castAbility(hero,ab.id);
+            }
+          }
+        },false,btnDisabled,tip,_btnCls);
+        if(_btn){
+          _btn.dataset.abId=ab.id;
+          _btn.dataset.abIdx=String(abIdx);
+          _btn.dataset.heroId=String(hero.id);
+          self._abilityButtons.push(_btn);
+        }
+      })(abils[ai],ai);
+    }
+
+    var _heroGroup=[hero];
+  for(var _hz=0;_hz<sel.length;_hz++){if(sel[_hz]!==hero&&sel[_hz].role!=='worker') _heroGroup.push(sel[_hz]);}
+  var _sepC=document.createElement('div');_sepC.className='section-sep';_sepC.textContent='Приказы';box.appendChild(_sepC);
+  this.addAction(box,toolIconImg('attack'),'[A] A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack');
+  this.addAction(box,toolIconImg('stop'),'[S] Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();});
+  this.addAction(box,toolIconImg('patrol'),'[P] Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol');
+  this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
+  this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
+  this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
+  var _isHoldHero=hero.stance==='hold';
+  this.addAction(box,toolIconImg('hold'),(_isHoldHero?'✕ ':'')+t_('hold'),null,function(){
+    var _ns=_isHoldHero?'aggressive':'hold';
+    for(var _hw=0;_hw<_heroGroup.length;_hw++){
+      _heroGroup[_hw].stance=_ns;
+      if(_ns==='hold'){_heroGroup[_hw].originX=_heroGroup[_hw].x;_heroGroup[_hw].originY=_heroGroup[_hw].y;}
+    }
+    self.showHint((_ns==='hold'?'Держать вкл':'Держать выкл'),1);
+    self.renderActions(true);
+  },_isHoldHero,false,_isHoldHero?'Стойка: держать позицию':'Стойка: агрессивная');
+  this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
+    var _th=null,_bdT=Infinity;
+    for(var _fi=0;_fi<g.buildings.length;_fi++){
+      var _tb=g.buildings[_fi];
+      if(_tb.pid!==g.playerPid||_tb.kind!=='townhall'||_tb.dead) continue;
+      var _dT=(_tb.x-hero.x)*(_tb.x-hero.x)+(_tb.y-hero.y)*(_tb.y-hero.y);
+      if(_dT<_bdT){_bdT=_dT;_th=_tb;}
+    }
+    if(!_th) return;
+    for(var _wi2=0;_wi2<_heroGroup.length;_wi2++){
+      var _ff=_heroGroup[_wi2];
+      _ff.target=null;_ff.lockedTarget=null;_ff.attackMoveTo=null;_ff.patrolRoute=null;
+      _ff.moveTo={x:_th.x+(Math.random()-0.5)*60,y:_th.y+(Math.random()-0.5)*60};
+      _ff._path=null;_ff._pathIdx=0;_ff._retreating=true;
+    }
+    self.showHint('Отступление',1.2);
+  });
+  this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
+    g.selectAllCombat();
+    self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
+  },false,false,'Выделить всех войск');
+  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+}
+else if(sel.length){
+  var workers=[],fighters=[];
+  for(i=0;i<sel.length;i++){if(sel[i].role==='worker') workers.push(sel[i]);else fighters.push(sel[i]);}
+  if(workers.length){
+    var race=null;for(i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
+    if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();});
+    this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
+      var assigned=0;
+      for(var wi=0;wi<workers.length;wi++){
+        var wk=workers[wi];
+        var mine=g.findVisibleResourceForWorker(wk,'gold',900);
+        if(mine){
+          wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
+          wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
+          wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
+          wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
+          wk._path=null;wk._pathIdx=0;
+          wk.stationed=false;
+          assigned++;
+        }
+      }
+      if(!assigned) g.notify(t_('noResNearby'));
+      else Audio.sfx('click');
+    });
+    this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
+      var assigned=0;
+      for(var wi=0;wi<workers.length;wi++){
+        var wk=workers[wi];
+        var tree=g.findVisibleResourceForWorker(wk,'tree',900);
+        if(tree){
+          wk.gatherTarget=tree;wk._assignedMine=null;wk.carrying=null;wk.carryAmt=0;
+          wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
+          wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
+          wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
+          wk._path=null;wk._pathIdx=0;
+          wk.stationed=false;
+          assigned++;
+        }
+      }
+      if(!assigned) g.notify(t_('noResNearby'));
+      else Audio.sfx('click');
+    });
+    var hasUnfinished=false;
+    for(i=0;i<g.buildings.length;i++){var bu=g.buildings[i];if(bu.pid===g.playerPid&&!bu.completed&&!bu.dead){hasUnfinished=true;break;}}
+    if(hasUnfinished){
+      this.addAction(box,toolIconImg('finishBuild'),t_('finishBuild'),null,function(){
+        var target=null,bd=Infinity;
+        for(var bi2=0;bi2<g.buildings.length;bi2++){var bb=g.buildings[bi2];if(bb.pid!==g.playerPid||bb.completed||bb.dead) continue;var d=(bb.x-workers[0].x)*(bb.x-workers[0].x)+(bb.y-workers[0].y)*(bb.y-workers[0].y);if(d<bd){bd=d;target=bb;}}
+        if(target){for(var wi=0;wi<workers.length;wi++){var wk=workers[wi];wk.buildTarget=target;wk.gatherTarget=null;wk.moveTo=null;wk.repairTarget=null;wk.demolishTarget=null;wk.carrying=null;wk.carryAmt=0;wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;wk._path=null;wk._pathIdx=0;wk.stationed=false;}Audio.sfx('build');}
+      });
+    }
+    var damaged=null,damDist=Infinity;
+    for(i=0;i<g.buildings.length;i++){
+      var bd3=g.buildings[i];
+      if(bd3.pid!==g.playerPid||bd3.dead||!bd3.completed) continue;
+      if(bd3.hp>=bd3.maxHp) continue;
+      var dd3=(bd3.x-workers[0].x)*(bd3.x-workers[0].x)+(bd3.y-workers[0].y)*(bd3.y-workers[0].y);
+      if(dd3<damDist){damDist=dd3;damaged=bd3;}
+    }
+    if(damaged){
+      var repairTip=(t_('repairTooltip')||'Починить повреждённое здание')+'\n'+bldName(damaged.race,damaged.kind)+' — HP '+Math.ceil(damaged.hp)+'/'+damaged.maxHp;
+      this.addAction(box,toolIconImg('repair'),t_('repair')||'Ремонт',null,function(){
+        for(var wi2=0;wi2<workers.length;wi2++){
+          var wk3=workers[wi2];
+          wk3.repairTarget=damaged;wk3.buildTarget=null;wk3.gatherTarget=null;wk3.moveTo=null;
+          wk3.demolishTarget=null;wk3.target=null;wk3.lockedTarget=null;wk3._insideMine=false;wk3._mineSlot=-1;wk3._waitingForMine=false;wk3._path=null;wk3._pathIdx=0;
+          wk3.stationed=false;
+        }
+        Audio.sfx('repair');
+      },false,false,repairTip);
+    }
+    this.addAction(box,'<img src="'+getWorkersIconURL(race)+'" alt="">',t_('workersAll'),null,function(){g.selectWorkers();});
+  }
+  if(fighters.length){
+    this.addAction(box,toolIconImg('attack'),'[A] A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack');
+    this.addAction(box,toolIconImg('stop'),'[S] Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();});
+    this.addAction(box,toolIconImg('patrol'),'[P] Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol');
+    this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
+    this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
+    this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
+    var isHold=fighters[0].stance==='hold';
+    this.addAction(box,toolIconImg('hold'),(isHold?'✕ ':'')+t_('hold'),null,function(){
+      var newStance=isHold?'aggressive':'hold';
+      for(var wi=0;wi<fighters.length;wi++){
+        fighters[wi].stance=newStance;
+        if(newStance==='hold'){fighters[wi].originX=fighters[wi].x;fighters[wi].originY=fighters[wi].y;}
+      }
+      self.showHint((newStance==='hold'?'Держать вкл':'Держать выкл'),1);
+      self.renderActions(true);
+    },isHold,false,isHold?'Стойка: держать позицию (не преследовать)':'Стойка: агрессивная (преследовать врагов)');
+    this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
+      var th=null,bdT=Infinity;
+      for(var fi=0;fi<g.buildings.length;fi++){
+        var tb=g.buildings[fi];
+        if(tb.pid!==g.playerPid||tb.kind!=='townhall'||tb.dead) continue;
+        var dT=(tb.x-fighters[0].x)*(tb.x-fighters[0].x)+(tb.y-fighters[0].y)*(tb.y-fighters[0].y);
+        if(dT<bdT){bdT=dT;th=tb;}
+      }
+      if(!th) return;
+      for(var wi2=0;wi2<fighters.length;wi2++){
+        var _f=fighters[wi2];
+        _f.target=null;_f.lockedTarget=null;
+        _f.attackMoveTo=null;_f.patrolRoute=null;
+        _f.moveTo={x:th.x+(Math.random()-0.5)*60,y:th.y+(Math.random()-0.5)*60};
+        _f._path=null;_f._pathIdx=0;
+        _f._retreating=true;
+      }
+      self.showHint('Отступление',1.2);
+    });
+    this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
+      g.selectAllCombat();
+      self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
+    },false,false,'Выделить всех войск');
+  }
+  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+}
+
+      if(selB.length){
+    var b2=selB[0];
+    if(!b2.completed){var div=document.createElement('div');div.style.cssText='color:#a8c5d6;font-size:11px;padding:8px;text-align:center;grid-column:1/-1';div.textContent=Math.floor((b2.buildProgress/b2.buildTime)*100)+'%';box.appendChild(div);}
+    if(b2.completed&&b2.kind==='townhall'){
+      var lvl=b2.level||1;
+      var thBusyTrain=(b2.queue&&b2.queue.length>0);
+      if(lvl<3&&!b2.upgrading){
+        var cost=TH_UPG[lvl],res=g.getRes(g.playerPid);
+        var can=(res.gold>=cost.gold&&res.wood>=cost.wood)&&!thBusyTrain;
+        var thTip=thBusyTrain?'Нельзя улучшать, пока идёт найм рабочих':'Улучшить до ур.'+(lvl+1);
+        this.addAction(box,toolIconImg('upgrade'),t_('upgrade')+' '+lvl+'→'+(lvl+1),self.costStr(cost.gold,cost.wood),function(){self.upgradeTH(b2);},false,!can,thTip);
+      }
+      var wdef=RACES[b2.race].units.worker;
+      var wprice=self.costStr(wdef.gold,wdef.wood)+self.foodStr('worker');
+      var wtip=uName(b2.race,'worker')+'\nHP '+wdef.hp+' · Урон '+wdef.dmg+' · Дальность '+wdef.range+' · Скорость '+wdef.spd+'\nЗолото: '+wdef.gold+' · Еда: '+(FOOD_COST.worker||1)+'\nВремя: '+wdef.time+'с\n'+t_('u_worker_desc');
+      var trainBlocked=!!b2.upgrading;
+      this.addAction(box,unitIconImg(b2.race,'worker'),uName(b2.race,'worker'),wprice,function(){self.queueUnit(b2,'worker');},false,trainBlocked,trainBlocked?'Идёт улучшение ратуши':wtip);
+    } else if(b2.completed){
+      var thLvl=g.getTHLevel(g.playerPid),roles=[];
+      var keys=Object.keys(UNIT_UNLOCK);
+      for(i=0;i<keys.length;i++){var r=keys[i],cfg=UNIT_UNLOCK[r];if(cfg.b!==b2.kind) continue;if(cfg.th>thLvl) continue;roles.push(r);}
+      if(b2.kind==='forge'){
+        var busyForge=b2.techUpgrading;
+        var forgeQueueBusy=b2.queue.length>0;
+        if(roles.length>0){
+          var hireHdr=document.createElement('div');
+          hireHdr.className='section-sep';
+          hireHdr.textContent=t_('hireUnits')+(busyForge?' (кузница занята)':'');
+          box.appendChild(hireHdr);
+          for(i=0;i<roles.length;i++){
+            (function(rr){
+              var def=RACES[b2.race].units[rr];if(!def) return;
+              var priceU=self.costStr(def.gold,def.wood)+self.foodStr(rr);
+              var tipU=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              if(busyForge) tipU='Кузница занята улучшением — найм недоступен\n\n'+tipU;
+              self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU,function(){self.queueUnit(b2,rr);},false,!!busyForge,tipU);
+            })(roles[i]);
+          }
+        }
+        var upHdr=document.createElement('div');
+        upHdr.className='section-sep';
+        upHdr.textContent=t_('techUpgrades')+(forgeQueueBusy?' (идёт найм)':'');
+        box.appendChild(upHdr);
+        var roleIcons={melee:'weapon_melee',ranged:'weapon_ranged',spear:'weapon_spear',cav:'weapon_cav',elite:'weapon_elite'};
+        var armorIcons={melee:'armor_melee',ranged:'armor_ranged',spear:'armor_spear',cav:'armor_cav',elite:'armor_elite'};
+        for(var ui2=0;ui2<UPGRADE_ROLES.length;ui2++){
+          (function(role){
+            var up=g.getUnitUpgrades(g.playerPid,role),rdef=RACES[b2.race].units[role];if(!rdef) return;
+            var rName=uName(b2.race,role);
+            var res2=g.getRes(g.playerPid);
+            if(up.w<3){
+              var cw=UPGRADE_COST[up.w];
+              var canW=res2.gold>=cw.gold && res2.wood>=cw.wood && !busyForge && !forgeQueueBusy;
+              var curW=up.w*15,nextW=(up.w+1)*15;
+              var tipW=t_('wUpgTip').replace('{cur}',curW).replace('{next}',nextW).replace('{roles}',rName);
+              if(forgeQueueBusy) tipW='Идёт найм в кузнице — улучшения заблокированы\n\n'+tipW;
+              if(busyForge) tipW='Кузница уже улучшается\n\n'+tipW;
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' '+up.w+'→'+(up.w+1),self.costStr(cw.gold,cw.wood),function(){self.startForgeUpgrade(b2,role,'w');},false,!canW,tipW);
+            } else {
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — максимально прокачано.');
+            }
+            if(up.a<3){
+              var ca=UPGRADE_COST[up.a];
+              var canA=res2.gold>=ca.gold && res2.wood>=ca.wood && !busyForge && !forgeQueueBusy;
+              var curA=up.a*8,nextA=(up.a+1)*8;
+              var tipA=t_('aUpgTip').replace('{cur}',curA).replace('{next}',nextA).replace('{roles}',rName);
+              if(forgeQueueBusy) tipA='Идёт найм в кузнице — улучшения заблокированы\n\n'+tipA;
+              if(busyForge) tipA='Кузница уже улучшается\n\n'+tipA;
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' '+up.a+'→'+(up.a+1),self.costStr(ca.gold,ca.wood),function(){self.startForgeUpgrade(b2,role,'a');},false,!canA,tipA);
+            } else {
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — броня максимальна.');
+            }
+          })(UPGRADE_ROLES[ui2]);
+        }
+        if(busyForge){
+          var busyDiv=document.createElement('div');
+          busyDiv.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center';
+          var pctF=Math.max(0,Math.min(100,Math.round((1-busyForge.timeLeft/busyForge.timeTotal)*100)));
+          busyDiv.textContent=t_('upgradingFor')+' '+uName(b2.race,busyForge.role)+' — '+pctF+'%';
+          box.appendChild(busyDiv);
+        }
+      } else {
+        var _hts=getHeroTypes(b2.race);
+        if(b2.kind==='altar'){
+          for(var _hti=0;_hti<_hts.length;_hti++){
+            (function(_HT){
+              var _heroDef=getHeroVariant(b2.race,_HT);
+              if(!_heroDef) return;
+              var _aliveHT=0;
+              for(var _ahi=0;_ahi<g.units.length;_ahi++){var _ahu=g.units[_ahi];if(_ahu.isHero&&_ahu.pid===g.playerPid&&!_ahu.dying&&_ahu.heroType===_HT) _aliveHT++;}
+              if(_aliveHT>=1) return;
+              var _qHT=false;
+              for(var _hq2=0;_hq2<g.buildings.length;_hq2++){
+                var _hqb2=g.buildings[_hq2];
+                if(_hqb2.pid!==g.playerPid||_hqb2.dead) continue;
+                for(var _qqi2=0;_qqi2<_hqb2.queue.length;_qqi2++){if(_hqb2.queue[_qqi2].role==='hero'&&_hqb2.queue[_qqi2].heroType===_HT){_qHT=true;break;}}
+                if(_hqb2.reviveQueue&&_hqb2.reviveQueue.length>0){for(var _rqi2=0;_rqi2<_hqb2.reviveQueue.length;_rqi2++){if(_hqb2.reviveQueue[_rqi2].reviveData&&_hqb2.reviveQueue[_rqi2].reviveData.heroType===_HT){_qHT=true;break;}}}
+                if(_qHT) break;
+              }
+              if(_qHT) return;
+              var _nameKey='hero_'+_HT;
+              var _displayName=t_(_nameKey)!==_nameKey?t_(_nameKey):(_HT==='paladin'?'Паладин':_HT==='warchief'?'Вождь':_HT==='archdruid'?'Архидруид':_HT);
+              var _deadKey=g.playerPid+'_'+_HT;
+              var _deadH2=g.deadHeroes?g.deadHeroes[_deadKey]:null;
+              if(_deadH2){
+                var _res2=g.getRes(g.playerPid);
+                var _canR2=(_res2.gold>=_heroDef.gold)&&(_res2.wood>=_heroDef.wood);
+                var _timeR=25+2*(_deadH2.level||1);
+                var _priceR=self.costStr(_heroDef.gold,_heroDef.wood)+self.foodStr('hero');
+                var _tipR=t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level+'\nЗолото: '+_heroDef.gold+' · Дерево: '+_heroDef.wood+'\nВремя: '+_timeR+'с\nСпособности и очки сохранятся.';
+                self.addAction(box,unitIconImg(b2.race,'hero',_HT),t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level,_priceR,function(){self.resurrectHero(b2,_HT);},false,!_canR2,_tipR);
+              } else {
+                var _priceH=self.costStr(_heroDef.gold,_heroDef.wood)+self.foodStr('hero');
+                var _tipH=_displayName+'\nHP '+_heroDef.hp+' · Урон '+_heroDef.dmg+' · Дальность '+_heroDef.range+' · Скорость '+_heroDef.spd+'\nЗолото: '+_heroDef.gold+' · Дерево: '+_heroDef.wood+'\nВремя: '+_heroDef.time+'с';
+                self.addAction(box,unitIconImg(b2.race,'hero',_HT),_displayName,_priceH,function(){self.queueUnit(b2,'hero',_HT);},false,false,_tipH);
+              }
+            })(_hts[_hti]);
+          }
+        } else {
+          for(i=0;i<roles.length;i++){
+            (function(rr){
+              var def=RACES[b2.race].units[rr];if(!def) return;
+              var priceU2=self.costStr(def.gold,def.wood)+self.foodStr(rr);
+              var tipU2=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU2,function(){self.queueUnit(b2,rr);},false,false,tipU2);
+            })(roles[i]);
+          }
+        }
+      }
+    }
+    if(b2.queue.length>0) this.addAction(box,toolIconImg('cancel'),t_('cancel'),b2.queue.length+'',function(){var qr=b2.queue.shift();if(qr){var rd=RACES[qr.race],qd=rd&&rd.units[qr.role];if(qd) g.addRes(g.playerPid,qd.gold||0,qd.wood||0);}self.renderActions(true);});
+    var spawnsUnits=(b2.kind==='townhall'||b2.kind==='barracks'||b2.kind==='magic'||b2.kind==='forge'||b2.kind==='altar');
+    if(spawnsUnits&&b2.completed){
+      var hasRally=!!b2.rallyPoint;
+      this.addAction(box,toolIconImg('patrol'),(hasRally?'✓ ':'')+'Указать точку сбора',null,function(){
+        Input.clearPending('rally');
+        Input.pendingRallyPoint=b2;
+        self.showOrderBar('ПКМ по земле — точка сбора. Esc — отмена.');
+      },hasRally,false,'ЛКМ — задать. ПКМ на здании с точкой — удалить.');
+    }
+    if(b2.kind==='tower'&&b2.completed){
+      if(b2._towerUpgrading){
+        var tuPct=Math.max(0,Math.min(100,Math.round((1-b2._towerUpgradeTimeLeft/b2._towerUpgradeTotal)*100)));
+        var tuDivP=document.createElement('div');
+        tuDivP.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center';
+        tuDivP.textContent='Улучшение: '+tuPct+'% ('+towerUpgradeName(b2._pendingUpgrade)+')';
+        box.appendChild(tuDivP);
+        var _tuCancDef=b2._pendingUpgrade?(TOWER_UPGRADES[b2.race]&&TOWER_UPGRADES[b2.race][b2._pendingUpgrade]):null;
+        var _refundPrice='';
+        if(_tuCancDef){
+          _refundPrice=self.costStr(Math.floor(_tuCancDef.cost.gold*0.5),Math.floor(_tuCancDef.cost.wood*0.5));
+        }
+        var _cancelTip='Отменить улучшение башни. Вернёт 50% стоимости';
+        if(_tuCancDef) _cancelTip+=' ('+Math.floor(_tuCancDef.cost.gold*0.5)+' зол., '+Math.floor(_tuCancDef.cost.wood*0.5)+' дер.)';
+        this.addAction(box,toolIconImg('cancel'),'Отменить улучшение',_refundPrice,function(){
+          self.cancelTowerUpgrade(b2);
+        },false,false,_cancelTip);
+      } else if(b2.towerUpgrade){
+        var tuInfo=TOWER_UPGRADES[b2.race]&&TOWER_UPGRADES[b2.race][b2.towerUpgrade];
+        var tuName=tuInfo?(LC==='en'?tuInfo.nameEn:tuInfo.name):b2.towerUpgrade;
+        var tuDiv=document.createElement('div');
+        tuDiv.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center;border-top:1px solid #3d4c68;margin-top:4px';
+        tuDiv.textContent='Улучшение: '+tuName;
+        box.appendChild(tuDiv);
+      } else if(towerCanUpgrade(b2)){
+        var opts=TOWER_UPGRADES[b2.race]||{};
+        var upgHdr=document.createElement('div');
+        upgHdr.className='section-sep';upgHdr.textContent='Улучшение башни (1 из 2, навсегда)';
+        box.appendChild(upgHdr);
+        for(var upKey in opts){
+          (function(uk,udef){
+            var resU=g.getRes(g.playerPid);
+            var canU=resU.gold>=udef.cost.gold&&resU.wood>=udef.cost.wood;
+            var nameU=LC==='en'?udef.nameEn:udef.name;
+            var statsTxt=nameU;
+            statsTxt+='\nУрон: '+udef.atk+' / '+udef.atkCd+'с';
+            statsTxt+='\nДальность: '+udef.rng;
+            statsTxt+='\nЗолото: '+udef.cost.gold;
+            statsTxt+='\nДерево: '+udef.cost.wood;
+            statsTxt+='\nВремя: '+udef.time+'с';
+            var dscParts=[];
+            if(udef.burnDmg) dscParts.push('Поджог '+udef.burnDmg+'/сек на '+udef.burnDur+'с.');
+            if(udef.aoe) dscParts.push('Урон по площади '+udef.aoe+'px ('+Math.round(udef.aoeEdge*100)+'% по краю).');
+            if(udef.healAmt) dscParts.push('Лечит '+udef.healAmt+' HP слабейшему союзнику в радиусе '+udef.healR+'px.');
+            if(udef.cone) dscParts.push('Конус атаки '+udef.cone+'°.');
+            if(udef.poisonDmg) dscParts.push('Яд '+udef.poisonDmg+'/сек на '+udef.poisonDur+'с (до '+udef.maxStacks+' стаков).');
+            if(udef.ignoreArmor) dscParts.push('Игнорирует броню цели.');
+            if(udef.hpBonus) dscParts.push('Даёт +'+udef.hpBonus+' HP к максимуму.');
+            statsTxt+='\n\n'+dscParts.join(' ');
+            self.addAction(box,toolIconImg('tower_'+uk,40),nameU,self.costStr(udef.cost.gold,udef.cost.wood),function(){
+              if(b2._towerUpgrading||b2.towerUpgrade||b2._pendingUpgrade){g.notify('Башня уже улучшается');return;}
+              var r2=g.getRes(g.playerPid);
+              if(r2.gold<udef.cost.gold||r2.wood<udef.cost.wood){g.notify(t_('nGold'));return;}
+              g.subRes(g.playerPid,udef.cost.gold,udef.cost.wood);
+              b2._pendingUpgrade=uk;
+              b2._towerUpgrading=true;
+              b2._towerUpgradeTimeLeft=udef.time;
+              b2._towerUpgradeTotal=udef.time;
+              Audio.sfx('upgrade',b2.x,b2.y);
+              self.renderActions(true);
+            },false,!canU,statsTxt);
+          })(upKey,opts[upKey]);
+        }
+      }
+    }
+    if(b2.kind==='lumber'&&b2.completed){
+      var lvlS=b2.sawmillLevel||0;
+      if(lvlS>=3){
+        this.addAction(box,toolIconImg('upgrade'),'Лесопилка MAX','',function(){},false,true,'Лесопилка максимально улучшена');
+      } else if(b2.sawmillUpgrading){
+        var pctS=Math.round((1-b2.sawmillUpgradeTimeLeft/b2.sawmillUpgradeTotal)*100);
+        this.addAction(box,toolIconImg('upgrade'),'Улучшение '+pctS+'%','',function(){},false,true,'Улучшение лесопилки в процессе');
+      } else {
+        var costS=SAWMILL_UPG[lvlS];
+        var resS=g.getRes(g.playerPid);
+        var canS=resS.gold>=costS.gold&&resS.wood>=costS.wood;
+        var bonusPct=Math.round(costS.hpBonus*100);
+        var tipS='Улучшить лесопилку до ур.'+(lvlS+1)+'\nВсем зданиям владельца +'+bonusPct+'% HP\n(Не складывается с другими лесопилками)\nВремя: '+costS.time+'с';
+        this.addAction(box,toolIconImg('upgrade'),'Улучшить лесопилку→'+(lvlS+1),self.costStr(costS.gold,costS.wood),function(){
+          var resS2=g.getRes(g.playerPid);
+          if(resS2.gold<costS.gold||resS2.wood<costS.wood){g.notify(t_('nGold'));return;}
+          g.subRes(g.playerPid,costS.gold,costS.wood);
+          b2.sawmillUpgrading=true;
+          b2.sawmillUpgradeTimeLeft=costS.time;
+          b2.sawmillUpgradeTotal=costS.time;
+          Audio.sfx('sawmill_upgrade',b2.x,b2.y);
+          self.renderActions(true);
+        },false,!canS,tipS);
+      }
+    }
+    if(!b2.completed){
+      var cancelTip='Отменить постройку. Вернёт полную стоимость ('+b2.costGold+'+'+b2.costWood+'), рабочий освободится.';
+      this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip);
+    } else if(b2.kind!=='townhall'){
+      this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);});
+    }
+    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  }
+};
+
+      UISys.prototype._updateAbilityButtons=function(){
+  if(!this._abilityButtons||!this._abilityButtons.length||!Game_) return;
+  var hero=null;
+  for(var _ai=0;_ai<this._abilityButtons.length;_ai++){
+    var _btn=this._abilityButtons[_ai];
+    if(!_btn||!_btn.isConnected) continue;
+    var _hid=parseInt(_btn.dataset.heroId);
+    if(!hero){
+      for(var ui=0;ui<Game_.units.length;ui++){if(Game_.units[ui].id===_hid){hero=Game_.units[ui];break;}}
+      if(!hero) return;
+    }
+    var _stunnedHero=(hero.stunT>0||hero.rootT>0);
+    var abId=_btn.dataset.abId;
+    var abIdx=parseInt(_btn.dataset.abIdx);
+    var ab=null;
+    for(var a=0;a<hero.heroAbilities.length;a++){if(hero.heroAbilities[a].id===abId){ab=hero.heroAbilities[a];break;}}
+    if(!ab){continue;}
+    var lvl=hero.abilityLevels[abId]||0;
+    var cd=0;
+    if(ab.type==='passive') cd=0;
+    else if(abIdx===0) cd=hero.cdA1;
+    else if(abIdx===1) cd=hero.cdA2;
+    else if(abIdx===2) cd=hero.cdA3;
+    else if(ab.type==='ultimate') cd=hero.cdUlt;
+    var isPassive=(ab.type==='passive');
+    var canLvlUp=false;
+    if(hero.skillPoints>0&&lvl<3){
+      if(ab.type==='ultimate'){var _needLvl=6+lvl*2;canLvlUp=(hero.level>=_needLvl);}
+      else canLvlUp=true;
+    }
+    var hasMana=(hero.mana||0)>=(ab.mana||0);
+    var canUse=!isPassive&&lvl>0&&cd<=0&&(ab.type!=='ultimate'||hero.ultUnlocked)&&hasMana&&!_stunnedHero;
+    if(canLvlUp) _btn.classList.add('can-level'); else _btn.classList.remove('can-level');
+    var lblEl=_btn.querySelector('.lbl');
+    if(lblEl){
+      var key=abIdx===0?'[Q] ':abIdx===1?'[W] ':ab.type==='ultimate'?'[R] ':'[E] ';
+      var newLbl=key+t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
+      if(ab.type==='ultimate'){
+        if(!hero.ultUnlocked) newLbl+=' (X)';
+        else if(lvl<3&&!canLvlUp){newLbl+=' (ур.'+(6+lvl*2)+')';}
+      }
+      if(canLvlUp) newLbl+=' +';
+      if(lblEl.textContent!==newLbl) lblEl.textContent=newLbl;
+    }
+    var priceEl=_btn.querySelector('.price');
+    if(priceEl){
+      var newPrice='';
+      if(cd>0) newPrice+=Math.ceil(cd)+'с';
+      if(!isPassive) newPrice+=(newPrice?' ':'')+(ab.mana||35)+'маны';
+      if(priceEl.textContent!==newPrice) priceEl.textContent=newPrice;
+    }
+    var wantDis=(!(canLvlUp||canUse))||(_stunnedHero&&!isPassive&&lvl>0);
+    if(wantDis!==_btn.disabled){_btn.disabled=wantDis;}
+  }
+};
+UISys.prototype.update=function(){
+  var g=Game_;if(!g) return;
+  try{
+    var res=g.getRes(g.playerPid);
+    this.$('h-gold').textContent=Math.floor(res.gold);
+    this.$('h-wood').textContent=Math.floor(res.wood);
+    var popText=res.food+'/'+res.maxFood;
+    if(res.maxFood>=MAX_FOOD) popText+=' (макс)';
+    this.$('h-pop').textContent=popText;
+    var mm=Math.floor(g.time/60),ss=Math.floor(g.time%60);
+    this.$('h-time').textContent=(mm<10?'0':'')+mm+':'+(ss<10?'0':'')+ss;
+    while(g.notifications.length){var n=g.notifications.shift();this.pushNotif(n.text);}
+    var box=this.$('actions');
+    if(box.dataset.menu!=='build'&&box.dataset.menu!=='placing'){
+      var hash=this.getActionsHash();
+      if(hash!==this._lastActionsHash){this._lastActionsHash=hash;this.renderActions(true);}
+      else this._updateAbilityButtons();
+    }
+    this.updateQueuePanel();
+    this._mmTimer=(this._mmTimer||0)+1;
+    if(this._mmTimer>=2){this._mmTimer=0;this.drawMinimap();}
+    this._infoTimer=(this._infoTimer||0)+1;
+    if(this._infoTimer>=3){this._infoTimer=0;this.refreshInfoOnly();this._refreshPortraitBars();}
+    if(!Settings._isMobile && Input.mouseInside) this._showUnitHoverTip();
+    if(g.gameOver&&!this._gameOverShown){
+      this._gameOverShown=true;
+      var self=this;
+      setTimeout(function(){
+        var go=self.$('gameover');
+        self.$('go-title').textContent=g.result==='win'?t_('victory'):t_('defeat');
+        self.$('go-sub').textContent=g.result==='win'?t_('vsub'):t_('dsub');
+        self._goTab='players';
+        var tabs=document.querySelectorAll('.go-tab');
+        for(var _ti=0;_ti<tabs.length;_ti++){tabs[_ti].classList.toggle('active',tabs[_ti].dataset.tab==='players');}
+        self.renderGameOverStats();
+        go.classList.add('active');
+        Audio.sfx(g.result==='win'?'victory':'defeat');
+      },1200);
+      g.shake=2;
+    }
+  }catch(e){ERR('UI.update',e);}
+};
+UISys.prototype.updateQueuePanel=function(){
+  if(!Game_) return;
+  var g=Game_,selB=[];
+  for(var i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.sel&&b.pid===g.playerPid&&(b.queue.length>0||(b.reviveQueue&&b.reviveQueue.length>0))) selB.push(b);}
+  var panel=this.$('queue-panel'),list=this.$('queue-list');
+  if(!selB.length){panel.classList.remove('show');return;}
+  panel.classList.add('show');
+  var b=selB[0];
+  var qHash='';
+  for(var _qi=0;_qi<b.queue.length;_qi++) qHash+=b.queue[_qi].role.charAt(0)+b.queue[_qi].race.charAt(0)+'|';
+  if(b.reviveQueue&&b.reviveQueue.length) qHash+='REV'+Math.floor(b.reviveQueue[0].timeLeft);
+  if(list.dataset.qhash!==qHash){
+    list.dataset.qhash=qHash;
+    list.innerHTML='';
+    if(b.reviveQueue&&b.reviveQueue.length>0){
+      var rq=b.reviveQueue[0];
+      var itemR=document.createElement('div');itemR.className='q-item';
+      var nmR=document.createElement('div');nmR.className='q-name';
+      nmR.style.display='flex';nmR.style.alignItems='center';nmR.style.gap='4px';
+      nmR.innerHTML=unitIconImg(b.race,'hero',rq.reviveData?rq.reviveData.heroType:'paladin')+'<span>Воскрешение Ур.'+(rq.reviveData?rq.reviveData.level:'')+'</span>';
+      var barR=document.createElement('div');barR.className='q-bar-bg';
+      var fillR=document.createElement('div');fillR.className='q-bar-fill';fillR.style.width='0%';
+      barR.appendChild(fillR);
+      var wrapR=document.createElement('div');wrapR.style.flex='1';wrapR.appendChild(nmR);wrapR.appendChild(barR);
+      itemR.appendChild(wrapR);
+      var tmR=document.createElement('div');tmR.className='q-time';tmR.textContent=Math.ceil(rq.timeLeft)+'с';
+      itemR.appendChild(tmR);
+      list.appendChild(itemR);
+    }
+    for(var qi=0;qi<b.queue.length;qi++){
+      var q=b.queue[qi];
+      var item=document.createElement('div');item.className='q-item';
+      var nm=document.createElement('div');nm.className='q-name';
+      nm.style.display='flex';nm.style.alignItems='center';nm.style.gap='4px';
+      var _nmIcon=q.role==='hero'?unitIconImg(b.race,'hero',q.heroType):unitIconImg(b.race,q.role);
+      nm.innerHTML=_nmIcon+'<span>'+(q.role==='hero'?((t_('hero_'+q.heroType)!==('hero_'+q.heroType))?t_('hero_'+q.heroType):uName(b.race,'hero')):uName(b.race,q.role))+'</span>';
+      var bar=document.createElement('div');bar.className='q-bar-bg';
+      var fill=document.createElement('div');fill.className='q-bar-fill';fill.style.width='0%';
+      bar.appendChild(fill);
+      var wrap=document.createElement('div');wrap.style.flex='1';wrap.appendChild(nm);wrap.appendChild(bar);
+      item.appendChild(wrap);
+      var tm=document.createElement('div');tm.className='q-time';tm.textContent=Math.ceil(q.timeLeft)+'с';
+      item.appendChild(tm);
+      list.appendChild(item);
+    }
+  }
+  var items=list.children;
+  var offset=(b.reviveQueue&&b.reviveQueue.length)?1:0;
+  if(offset&&items[0]){
+    var rq2=b.reviveQueue[0];
+    var fillElR=items[0].querySelector('.q-bar-fill');
+    if(fillElR){var pctR=Math.max(0,Math.min(100,(1-rq2.timeLeft/rq2.timeTotal)*100));fillElR.style.width=pctR+'%';}
+    var tmElR=items[0].querySelector('.q-time');
+    if(tmElR) tmElR.textContent=Math.max(0,Math.ceil(rq2.timeLeft))+'с';
+  }
+  for(var qi2=0;qi2<b.queue.length;qi2++){
+    var q2=b.queue[qi2],it=items[qi2+offset];
+    if(!it) continue;
+    var fillEl=it.querySelector('.q-bar-fill');
+    if(fillEl){var pct=Math.max(0,Math.min(100,(1-q2.timeLeft/q2.timeTotal)*100));fillEl.style.width=pct+'%';}
+    var tmEl=it.querySelector('.q-time');
+    if(tmEl) tmEl.textContent=Math.max(0,Math.ceil(q2.timeLeft))+'с';
+  }
+};
+UISys.prototype.pushNotif=function(text){
+  var el=document.createElement('div');el.className='notif';el.textContent=text;
+  this.$('notifications').appendChild(el);
+  setTimeout(function(){if(el.parentNode) el.parentNode.removeChild(el);},3200);
+};
+UISys.prototype.drawMinimap=function(){
+  var g=Game_;if(!g||!Renderer_) return;
+  var cv=this.$('minimap'),ctx=cv.getContext('2d');
+  var W=cv.width,H=cv.height,sx=W/g.W,sy=H/g.H;
+  ctx.fillStyle='#1a2a1a';ctx.fillRect(0,0,W,H);
+  var cs=g.fogCellSize,i,j;
+  for(i=0;i<g.fogCols;i++) for(j=0;j<g.fogRows;j++){var f=g.fog[i+j*g.fogCols];if(f===2) continue;ctx.fillStyle=f===1?'rgba(0,0,0,0.55)':'rgba(0,0,0,0.92)';ctx.fillRect(i*cs*sx,j*cs*sy,cs*sx+0.5,cs*sy+0.5);}
+  for(i=0;i<g.resources.length;i++){var r=g.resources[i];if(r.dead||!g.isExplored(r.x,r.y)) continue;ctx.fillStyle=r.kind==='gold'?'#ffe066':'#2d5a2d';var sz=r.kind==='gold'?5:3;ctx.fillRect(r.x*sx-sz/2,r.y*sy-sz/2,sz,sz);}
+  for(i=0;i<g.creeps.length;i++){var c=g.creeps[i];if(c.dead||!g.isExplored(c.x,c.y)) continue;ctx.fillStyle=c.isBoss?'#ff6060':'#8a3030';ctx.fillRect(c.x*sx-2,c.y*sy-2,4,4);}
+  for(i=0;i<g.buildings.length;i++){
+    var b=g.buildings[i];if(b.dead) continue;
+    var visB=(b.pid===g.playerPid)||(b.team===g.playerTeam)||g.isVisible(b.x,b.y);
+    if(visB){
+      ctx.fillStyle=b.completed?teamColor(b.team):'#a08040';
+      ctx.fillRect(b.x*sx-3,b.y*sy-3,6,6);
+    } else if(g.isExplored(b.x,b.y)){
+      // ПАТЧ J-2: запомненные здания (серые)
+      ctx.fillStyle='rgba(120,120,140,0.7)';
+      ctx.fillRect(b.x*sx-3,b.y*sy-3,6,6);
+      ctx.strokeStyle='rgba(80,80,100,0.8)';ctx.lineWidth=1;
+      ctx.strokeRect(b.x*sx-3,b.y*sy-3,6,6);
+    }
+  }
+  for(i=0;i<g.units.length;i++){var u=g.units[i];if(u.dead||u.dying||u._isTotem) continue;
+    var visU=(u.pid===g.playerPid)||(u.team===g.playerTeam)||g.isVisible(u.x,u.y);
+    if(!visU) continue;
+    ctx.fillStyle=u.isHero?'#ffe9a8':teamColor(u.team);var s2=u.isHero?5:3;ctx.fillRect(u.x*sx-s2/2,u.y*sy-s2/2,s2,s2);}
+  var cam=g.camera,vx=(cam.x-Renderer_.w/2/cam.zoom)*sx,vy=(cam.y-Renderer_.h/2/cam.zoom)*sy,vw=Renderer_.w/cam.zoom*sx,vh=Renderer_.h/cam.zoom*sy;
+  ctx.strokeStyle='#e6c67a';ctx.lineWidth=2;ctx.strokeRect(vx,vy,vw,vh);
+};
+
+      UISys.prototype.updateWorldTip=function(){
+  var tip=this.$('world-tip');
+  if(!tip||!Game_||!Renderer_) return;
+  var show=this._mobileTip;
+  if(!show){tip.classList.remove('show');return;}
+  var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
+  var ent=pick.unit||pick.creep||pick.building||pick.resource;
+  if(!ent){tip.classList.remove('show');return;}
+  tip.classList.add('show');
+  var tt='';
+  if(pick.unit){
+    var u=pick.unit;
+    var name=u.isHero?('⭐ '+((t_('hero_'+(u.heroType||'paladin'))!==('hero_'+(u.heroType||'paladin')))?t_('hero_'+(u.heroType||'paladin')):uName(u.race,'hero'))):uName(u.race,u.role);
+    tt='<div class="tt-name">'+name+(u.isHero?' Ур.'+u.level:'')+' ('+t_('team')+(u.team+1)+')</div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(u.hp)+'/'+u.maxHp+'</span></div>';
+    if(u.isHero||u.isHealer) tt+='<div class="tt-row"><span>'+t_('mana')+'</span><span>'+Math.floor(u.mana||0)+'/'+(u.maxMana||100)+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+u.dmg+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+u.range+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_spd')+'</span><span>'+u.spd+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>'+(FOOD_COST[u.role]||1)+'</span></div>';
+    if(u.owner==='bot') tt+='<div class="tt-row"><span>Владелец</span><span>'+t_('bot')+'</span></div>';
+    var _effList=[];
+    if(u.invulT>0) _effList.push('Неуязвимость '+u.invulT.toFixed(1)+'с');
+    if(u.stunT>0) _effList.push('Оглушён '+u.stunT.toFixed(1)+'с');
+    if(u.rootT>0) _effList.push('Обездвижен '+u.rootT.toFixed(1)+'с');
+    if(u.slowT>0) _effList.push('Замедлен ×'+u.slowMul.toFixed(2)+' '+u.slowT.toFixed(1)+'с');
+    if(u.bleedT>0) _effList.push('Кровотечение/яд '+u.bleedDmg.toFixed(1)+'/с '+u.bleedT.toFixed(1)+'с');
+    if(u.markedT>0) _effList.push('Метка +'+Math.round((u.markedBonus-1)*100)+'% урона '+u.markedT.toFixed(1)+'с');
+    if(u.holyStrikeBuff) _effList.push('Святой удар ×1.6 следующая атака');
+    if(u.activeBuffT>0) _effList.push((u.buffType==='rage'?'Ярость +30% урона':'Ускорение +30%')+' '+u.activeBuffT.toFixed(1)+'с');
+    if(u.isHero&&u.bloodthirstHeal>0) _effList.push('Кровожадность: +'+Math.round(u.bloodthirstHeal*100)+'% от урона');
+    if(u.isHero&&u.regenPassive>0) _effList.push('Регенерация +'+u.regenPassive.toFixed(1)+' HP/с');
+    var _gc=Game_;
+    if(_gc&&_gc.auraCache){
+      if(_gc.auraCache.blessing&&_gc.auraCache.blessing[u.id]) _effList.push('Благословение: -10% входящего урона');
+      if(_gc.auraCache.dmg&&_gc.auraCache.dmg[u.id]) _effList.push('Кузница: +15% урона');
+      if(_gc.auraCache.manaRegen&&_gc.auraCache.manaRegen[u.id]) _effList.push('Магия: +15% регенерации маны');
+    }
+    if(_effList.length){
+      tt+='<div class="tt-desc"><b>Эффекты:</b><br>'+_effList.join('<br>')+'</div>';
+    }
+    var dk='u_'+u.role+'_desc';
+    var desc=t_(dk);
+    if(desc&&desc!==dk) tt+='<div class="tt-desc">'+desc+'</div>';
+  } else if(pick.creep){
+    var cc=pick.creep;
+    var creepName=getCreepName(cc.kind);
+    tt='<div class="tt-name">'+creepName+' Lv.'+cc.level+(cc.isBoss?' BOSS':'')+'</div>';
+    tt+='<div class="tt-row"><span>HP</span><span>'+Math.ceil(cc.hp)+'/'+cc.maxHp+'</span></div>';
+    tt+='<div class="tt-row"><span>Урон</span><span>'+cc.dmg+'</span></div>';
+    tt+='<div class="tt-row"><span>Броня</span><span>'+cc.armor.toFixed(2)+'</span></div>';
+    tt+='<div class="tt-row"><span>Награда</span><span>'+cc.goldReward+'</span></div>';
+  } else if(pick.building){
+    var b=pick.building;
+    var towerUpTag='';
+    if(b.kind==='tower'&&b.towerUpgrade) towerUpTag=' ('+towerUpgradeName(b.towerUpgrade)+')';
+    tt='<div class="tt-name">'+bldName(b.race,b.kind)+towerUpTag+(b.completed?' Ур.'+b.level:' '+Math.floor((b.buildProgress/b.buildTime)*100)+'%')+'</div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(b.hp)+'/'+b.maxHp+'</span></div>';
+    if(b.atk) tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+b.atk+'</span></div>';
+    if(b.rng) tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+b.rng+'</span></div>';
+    if(b.kind==='house') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+8</span></div>';
+    if(b.kind==='townhall') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+16</span></div>';
+    if(b.kind==='lumber'&&(b.sawmillLevel||0)>0) tt+='<div class="tt-row"><span>Уровень</span><span>'+b.sawmillLevel+'</span></div>';
+    if(b.techUpgrading) tt+='<div class="tt-row"><span>Прокачка</span><span>'+uName(b.race,b.techUpgrading.role)+'</span></div>';
+    var descKey='d_'+b.kind;
+    var descB=t_(descKey);
+    if(descB&&descB!==descKey) tt+='<div class="tt-desc">'+descB+'</div>';
+  } else if(pick.resource){
+    var r=pick.resource;
+    tt='<div class="tt-name">'+(r.kind==='gold'?t_('goldMine'):t_('treeRes'))+'</div>';
+    tt+='<div class="tt-row"><span>'+t_('remaining')+'</span><span>'+Math.floor(r.amount)+'</span></div>';
+    if(r.kind==='gold') tt+='<div class="tt-desc">'+t_('d_gold')+'</div>';
+    else tt+='<div class="tt-desc">'+t_('d_tree')+'</div>';
+  }
+  tip.innerHTML=tt;
+  var tx=Input.mouseX+16,ty=Input.mouseY+16;
+  if(tx+280>Renderer_.w) tx=Input.mouseX-282;
+  if(ty+140>Renderer_.h) ty=Input.mouseY-140;
+  tip.style.left=tx+'px';tip.style.top=ty+'px';
+};
+UISys.prototype._showUnitHoverTip=function(){
+  if(!Game_||!Renderer_) return;
+  var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
+  var id=pick.unit?pick.unit.id:0;
+  if(this._lastHoverUnitId===id) return;
+  this._lastHoverUnitId=id;
+  if(!id){
+    this._mobileTip=false;
+    this.$('world-tip').classList.remove('show');
+    return;
+  }
+  this._mobileTip=true;
+  this.updateWorldTip();
+};
+UISys.prototype.renderGameOverStats=function(){
+  if(!Game_) return;
+  var box=this.$('go-stats');if(!box) return;
+  var g=Game_,tab=this._goTab||'players';
+  var isMobile=Settings._isMobile || window.innerWidth<600;
+  if(isMobile){
+    var html='<div style="display:flex;flex-direction:column;gap:8px">';
+    function statCard(name,color,st){
+      var c=color||'#e8e8e8';
+      return '<div style="background:#0d1420;border:1px solid #3d4c68;border-radius:6px;padding:8px 10px;border-left:4px solid '+c+'">'
+        +'<div style="color:'+c+';font-weight:800;font-size:13px;margin-bottom:6px">'+name+'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:11px">'
+        +'<div><span style="color:#9ab">Золото:</span> <span style="color:#ffe9a8">'+(st.goldMined|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Дерево:</span> <span style="color:#c8a878">'+(st.woodMined|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Создано:</span> <span style="color:#a0ffa0">'+(st.unitsCreated|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Убито:</span> <span style="color:#ff8060">'+(st.enemiesKilled|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Крипов:</span> <span style="color:#ffd060">'+(st.creepsKilled|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Потери:</span> <span style="color:#ff6060">'+(st.unitsLost|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Зд. потеряно:</span> <span style="color:#ff6060">'+(st.buildingsLost|0)+'</span></div>'
+        +'<div><span style="color:#9ab">Зд. разрушено:</span> <span style="color:#a0ffa0">'+(st.buildingsDestroyed|0)+'</span></div>'
+        +'</div></div>';
+    }
+    if(tab==='players'){
+      for(var i=0;i<g.config.slots.length;i++){
+        var s=g.config.slots[i];
+        if(s.type==='empty') continue;
+        var st=g.stats[i]||{};
+        var label=(s.type==='player'?t_('player'):t_('bot'))+' · '+t_(s.race)+' (T'+(s.team+1)+')';
+        html+=statCard(label,teamColor(s.team),st);
+      }
+    } else if(tab==='teams'){
+      var teams={};
+      for(var i2=0;i2<g.config.slots.length;i2++){
+        var s2=g.config.slots[i2];
+        if(s2.type==='empty') continue;
+        if(!teams[s2.team]) teams[s2.team]={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0,members:[]};
+        var tt=teams[s2.team],st2=g.stats[i2]||{};
+        for(var f in tt){if(typeof tt[f]==='number') tt[f]+=st2[f]||0;}
+        tt.members.push((s2.type==='player'?t_('player'):t_('bot'))+'·'+t_(s2.race));
+      }
+      for(var tk in teams){
+        var tt2=teams[tk];
+        html+=statCard('Команда '+(parseInt(tk)+1)+'<div style="font-size:10px;color:#9ab;font-weight:400">'+tt2.members.join(', ')+'</div>',teamColor(parseInt(tk)),tt2);
+      }
+    } else {
+      var sum={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0};
+      for(var k2 in g.stats){var st3=g.stats[k2];for(var f2 in sum) sum[f2]+=st3[f2]||0;}
+      html+=statCard('ВСЕГО','#ffe9a8',sum);
+      var pst=g.stats[g.playerPid]||{};
+      html+=statCard('Вы','#e6c67a',pst);
+    }
+    html+='</div>';
+    box.innerHTML=html;
+    return;
+  }
+  var rows='';
+  function statRow(name,color,st){
+    return '<tr><td style="color:'+(color||'#e8e8e8')+';font-weight:700">'+name+'</td><td>'+(st.goldMined|0)+'</td><td>'+(st.woodMined|0)+'</td><td>'+(st.unitsCreated|0)+'</td><td>'+(st.enemiesKilled|0)+'</td><td>'+(st.creepsKilled|0)+'</td><td>'+(st.unitsLost|0)+'</td><td>'+(st.buildingsLost|0)+'</td><td>'+(st.buildingsDestroyed|0)+'</td></tr>';
+  }
+  var header='<table><thead><tr><th>Участник</th><th>Зол.</th><th>Дер.</th><th>Созд.</th><th>Уб.в.</th><th>Крипы</th><th>Потери</th><th>Зд.п.</th><th>Зд.р.</th></tr></thead><tbody>';
+  if(tab==='players'){
+    for(var i3=0;i3<g.config.slots.length;i3++){
+      var s3=g.config.slots[i3];
+      if(s3.type==='empty') continue;
+      var st3b=g.stats[i3]||{};
+      var label3=(s3.type==='player'?t_('player'):t_('bot'))+' · '+t_(s3.race)+' (T'+(s3.team+1)+')';
+      rows+=statRow(label3,teamColor(s3.team),st3b);
+    }
+  } else if(tab==='teams'){
+    var teams2={};
+    for(var i4=0;i4<g.config.slots.length;i4++){
+      var s4=g.config.slots[i4];
+      if(s4.type==='empty') continue;
+      if(!teams2[s4.team]) teams2[s4.team]={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0,members:[]};
+      var tt3=teams2[s4.team],st4=g.stats[i4]||{};
+      for(var f3 in tt3){if(typeof tt3[f3]==='number') tt3[f3]+=st4[f3]||0;}
+      tt3.members.push((s4.type==='player'?t_('player'):t_('bot'))+'·'+t_(s4.race));
+    }
+    for(var tk2 in teams2){
+      var tt4=teams2[tk2];
+      rows+=statRow('Команда '+(parseInt(tk2)+1)+': '+tt4.members.join(', '),teamColor(parseInt(tk2)),tt4);
+    }
+  } else {
+    var sum2={goldMined:0,woodMined:0,unitsCreated:0,enemiesKilled:0,creepsKilled:0,unitsLost:0,buildingsLost:0,buildingsDestroyed:0};
+    for(var k3 in g.stats){var st5=g.stats[k3];for(var f4 in sum2) sum2[f4]+=st5[f4]||0;}
+    rows+=statRow('ВСЕГО','#ffe9a8',sum2);
+    var pst2=g.stats[g.playerPid]||{};
+    rows+=statRow('Вы','#e6c67a',pst2);
+  }
+  box.innerHTML=header+rows+'</tbody></table>';
+};
+function getMinZoom(){if(!Game_||!Renderer_) return 0.15;return Math.max(Renderer_.w/Game_.W,Renderer_.h/Game_.H);}
+function clampCam(){if(!Game_||!Renderer_) return;var c=Game_.camera,minZ=getMinZoom();c.zoom=cl(c.zoom,minZ,3);var hw=Renderer_.w/2/c.zoom,hh=Renderer_.h/2/c.zoom;c.x=cl(c.x,hw,Game_.W-hw);c.y=cl(c.y,hh,Game_.H-hh);}
+function centerCam(){
+  if(!Game_||!Renderer_) return;
+  var c=Game_.camera,th=null;
+  for(var i=0;i<Game_.buildings.length;i++){var b=Game_.buildings[i];if(b.pid===Game_.playerPid&&b.kind==='townhall'&&b.owner==='player'){th=b;break;}}
+  if(!th){for(var i2=0;i2<Game_.buildings.length;i2++){var b2=Game_.buildings[i2];if(b2.pid===Game_.playerPid&&b2.kind==='townhall'){th=b2;break;}}}
+  if(!th){try{var sc=JSON.parse(localStorage.getItem('echo33_cam')||'null');if(sc&&sc.zoom&&sc.mapId===Game_.map.id){c.x=sc.x;c.y=sc.y;c.zoom=sc.zoom;clampCam();return;}}catch(e){}c.x=Game_.W/2;c.y=Game_.H/2;c.zoom=getMinZoom();clampCam();return;}
+  c.zoom=Math.max(getMinZoom(),Math.min(1,Renderer_.w/1500));
+  c.x=th.x;c.y=th.y;clampCam();
+}
+function clearAllCaches(){
+  try{
+    SPRITES={};
+    ICON_CACHE={};
+    TOOL_ICONS={};
+    _TOOL_IMG_CACHE={};
+    if(Game_){
+      Game_._pfVisited=null;
+      Game_._pfParent=null;
+      Game_._pfQueue=null;
+    }
+  }catch(e){ERR('clearAllCaches',e);}
+}
+
+      var Input={
+  boxSelect:null,keys:{},mouseX:0,mouseY:0,mouseInside:false,dragging:null,_escDown:false,formation:'box',
+  pendingRallyPoint:null,
+  touchStart:null,pinchDist:0,isTouch:false,
+  formationAngle:0,pendingOrder:null,shiftDown:false,pendingTargetedAbility:null,
+  _ignoreMouseUntil:0,
+  groups:{},_lastGroupKey:0,_lastGroupTime:0,_lastClickTime:0,_lastClickUnitId:0,
+  _lastS:0,
+  clearPending:function(except){
+    if(except!=='order') this.pendingOrder=null;
+    if(except!=='ability') this.pendingTargetedAbility=null;
+    if(except!=='rally') this.pendingRallyPoint=null;
+    if(UI) UI.hideOrderBar();
+  },
+  init:function(canvas){
+    var self=this;
+    var resume=function(){Audio.resume();if(UI) UI._hideWc3Tooltip();};
+    canvas.addEventListener('mousedown',resume);
+    canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
+    canvas.addEventListener('mousedown',function(e){
+      if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
+      var r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+      if(e.button===1){e.preventDefault();self.dragging={x:e.clientX,y:e.clientY};return;}
+      if(e.button===0){self.mouseX=mx;self.mouseY=my;self.mouseInside=true;self.boxSelect={active:true,x1:mx,y1:my,x2:mx,y2:my,add:e.ctrlKey||e.shiftKey};}
+      else if(e.button===2){
+        e.preventDefault();
+        if(self.pendingTargetedAbility){self.pendingTargetedAbility=null;if(UI) UI.hideOrderBar();return;}
+        if(Game_) Game_.handleRightClick(mx,my);
+      }
+    });
+    canvas.addEventListener('mousemove',function(e){
+      if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
+      var r=canvas.getBoundingClientRect();
+      self.mouseX=e.clientX-r.left;self.mouseY=e.clientY-r.top;self.mouseInside=true;
+      if(self.dragging&&Game_){var dx=e.clientX-self.dragging.x,dy=e.clientY-self.dragging.y;Game_.camera.x-=dx/Game_.camera.zoom;Game_.camera.y-=dy/Game_.camera.zoom;clampCam();self.dragging.x=e.clientX;self.dragging.y=e.clientY;}
+      if(self.boxSelect&&self.boxSelect.active){self.boxSelect.x2=self.mouseX;self.boxSelect.y2=self.mouseY;}
+    });
+    canvas.addEventListener('mouseleave',function(){self.mouseInside=false;});
+    function handleMouseUp(e){
+      if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
+      if(e.button===1){self.dragging=null;return;}
+      if(e.button!==0) return;
+      if(!self.boxSelect) return;
+      var b=self.boxSelect,w=Math.abs(b.x2-b.x1),h=Math.abs(b.y2-b.y1);
+      if(self.pendingTargetedAbility&&w<12&&h<12){
+        var pa=self.pendingTargetedAbility,hero=pa.hero,ab=pa.ab;
+        var wpt=Renderer_.s2w(b.x1,b.y1);
+        var bestT=null,bd=Infinity;
+        for(var ti=0;ti<Game_.units.length;ti++){
+          var tu=Game_.units[ti];
+          if(tu.team===hero.team||tu.dying) continue;
+          if(ab.range&&Math.hypot(tu.x-hero.x,tu.y-hero.y)>ab.range+tu.radius) continue;
+          var dd=(tu.x-wpt.x)*(tu.x-wpt.x)+(tu.y-wpt.y)*(tu.y-wpt.y);
+          if(dd<bd){bd=dd;bestT=tu;}
+        }
+        if(!bestT) for(var ti2=0;ti2<Game_.creeps.length;ti2++){var tc2=Game_.creeps[ti2];if(tc2.dying) continue;if(ab.range&&Math.hypot(tc2.x-hero.x,tc2.y-hero.y)>ab.range+tc2.radius) continue;var dd2=(tc2.x-wpt.x)*(tc2.x-wpt.x)+(tc2.y-wpt.y)*(tc2.y-wpt.y);if(dd2<bd){bd=dd2;bestT=tc2;}}
+        if(bestT){Game_.castAbility(hero,ab.id,bestT);}
+        self.pendingTargetedAbility=null;if(UI) UI.hideOrderBar();
+        self.boxSelect=null;return;
+      }
+      if(UI&&UI._placingKind&&w<8&&h<8){
+        var pick=Game_.pickScreen(b.x1,b.y1);
+        if(pick.building||pick.unit){UI.cancelPlacement();Game_.handleLeftClick(b.x1,b.y1,b.add);}
+        else{var wpt2=Renderer_.s2w(b.x1,b.y1);UI.tryPlaceAt(wpt2.x,wpt2.y);}
+        self.boxSelect=null;return;
+      }
+      if(w<12&&h<12){
+        var nowT2=performance.now();
+        var pickNow=Game_?Game_.pickScreen(b.x1,b.y1):{};
+        var pickedUnitId=(pickNow.unit&&pickNow.unit.pid===Game_.playerPid)?pickNow.unit.id:0;
+        var isDbl=(nowT2-self._lastClickTime<400)&&pickedUnitId>0&&pickedUnitId===self._lastClickUnitId;
+        self._lastClickTime=nowT2;
+        self._lastClickUnitId=pickedUnitId;
+        if(isDbl&&Game_) Game_.handleDoubleClick(b.x1,b.y1,b.add);
+        else if(Game_) Game_.handleLeftClick(b.x1,b.y1,b.add);
+      }
+      else{if(Game_) Game_.handleBoxSelect(b,b.add);}
+      self.boxSelect=null;
+    }
+    canvas.addEventListener('mouseup',handleMouseUp);
+    window.addEventListener('mouseup',function(e){
+      if(self.boxSelect&&self.boxSelect.active){if(e.target!==canvas) handleMouseUp(e);}
+      if(self.dragging) self.dragging=null;
+    });
+    canvas.addEventListener('wheel',function(e){
+      e.preventDefault();if(!Game_) return;
+      if(e.shiftKey){
+        self.formationAngle+=(e.deltaY>0?0.2:-0.2);
+        self.formationAngle=((self.formationAngle%TAU)+TAU)%TAU;
+        if(UI) UI.showHint('Строй: '+Math.round(self.formationAngle*180/Math.PI)+'°',1);
+        return;
+      }
+      if(e.ctrlKey||e.altKey||e.metaKey){
+        var fz=e.deltaY<0?1.15:0.87,minZ=getMinZoom();
+        Game_.camera.zoom=cl(Game_.camera.zoom*fz,minZ,3);clampCam();
+        return;
+      }
+      var cnt=0;
+      for(var _i=0;_i<Game_.units.length;_i++){
+        var _u=Game_.units[_i];
+        if(_u.sel&&_u.pid===Game_.playerPid&&!_u.dying) cnt++;
+      }
+      if(cnt>1){ if(UI) UI.cycleActiveUnit(e.deltaY<0?-1:1); return; }
+      var f=e.deltaY<0?1.15:0.87,minZ2=getMinZoom();
+      Game_.camera.zoom=cl(Game_.camera.zoom*f,minZ2,3);clampCam();
+    },{passive:false});
+
+        window.addEventListener('keydown',function(e){
+  if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')) return;
+  var k=e.key.toLowerCase();
+  if(e.key==='Shift') self.shiftDown=true;
+  self.keys[k]=true;
+  var digit=e.key.match(/^[1-9]$/);
+  if(digit&&Game_&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey){
+    var grp=parseInt(e.key);
+    if(self.groups[grp]&&self.groups[grp].length){
+      for(var _ui3=0;_ui3<Game_.units.length;_ui3++) if(Game_.units[_ui3].pid===Game_.playerPid) Game_.units[_ui3].sel=false;
+      var found=[];
+      for(var _gi=0;_gi<self.groups[grp].length;_gi++){
+        var _gid=self.groups[grp][_gi];
+        for(var _uj=0;_uj<Game_.units.length;_uj++){
+          if(Game_.units[_uj].id===_gid&&Game_.units[_uj].pid===Game_.playerPid&&!Game_.units[_uj].dying){Game_.units[_uj].sel=true;found.push(Game_.units[_uj]);break;}
+        }
+      }
+      UI.refreshSelection();
+      var nowT=performance.now();
+      if(self._lastGroupKey===grp && nowT-self._lastGroupTime<350 && found.length>0){
+        var cx=0,cy=0;
+        for(var _fi=0;_fi<found.length;_fi++){cx+=found[_fi].x;cy+=found[_fi].y;}
+        cx/=found.length;cy/=found.length;
+        if(Renderer_){Game_.camera.x=cx;Game_.camera.y=cy;clampCam();}
+      }
+      self._lastGroupKey=grp;self._lastGroupTime=nowT;
+      e.preventDefault();return;
+    }
+  }
+  if(digit&&e.shiftKey&&Game_&&!e.ctrlKey&&!e.altKey){
+    var grpS=parseInt(e.key);
+    if(self.groups[grpS]){
+      for(var _gu=0;_gu<Game_.units.length;_gu++){
+        var _u2=Game_.units[_gu];
+        if(_u2.sel&&_u2.pid===Game_.playerPid){
+          var idx=self.groups[grpS].indexOf(_u2.id);
+          if(idx>=0) self.groups[grpS].splice(idx,1);
+        }
+      }
+      UI.showHint('Убрано из группы '+grpS,1);
+    }
+    e.preventDefault();return;
+  }
+  if((e.ctrlKey||e.altKey)&&digit&&Game_){
+    var grp2=parseInt(e.key);
+    if(e.altKey){
+      if(!self.groups[grp2]) self.groups[grp2]=[];
+      for(var _uk=0;_uk<Game_.units.length;_uk++){
+        var _uu=Game_.units[_uk];
+        if(_uu.sel&&_uu.pid===Game_.playerPid&&!_uu.dying&&self.groups[grp2].indexOf(_uu.id)<0) self.groups[grp2].push(_uu.id);
+      }
+      UI.showHint('Добавлено в группу '+grp2,1);
+    } else {
+      self.groups[grp2]=[];
+      for(var _ul=0;_ul<Game_.units.length;_ul++){
+        var _uu2=Game_.units[_ul];
+        if(_uu2.sel&&_uu2.pid===Game_.playerPid&&!_uu2.dying) self.groups[grp2].push(_uu2.id);
+      }
+      UI.showHint('Группа '+grp2+' ('+self.groups[grp2].length+')',1);
+    }
+    e.preventDefault();return;
+  }
+  if(e.key==='Escape'&&Game_&&!self._escDown){
+    self._escDown=true;
+    var _hadState=false;
+    if(UI._placingKind){UI.cancelPlacement();_hadState=true;}
+    if(self.pendingRallyPoint||self.pendingOrder||self.pendingTargetedAbility){
+      self.pendingRallyPoint=null;self.pendingOrder=null;self.pendingTargetedAbility=null;
+      if(UI) UI.hideOrderBar();
+      _hadState=true;
+    }
+    if(!_hadState) Game_.togglePause();
+  }
+  var _K=Settings.keys||DEFAULT_KEYS;
+  if(k===_K.selectAll&&e.ctrlKey&&Game_){e.preventDefault();Game_.selectAllCombat();return;}
+  if(k===_K.jumpHero&&Game_){
+    e.preventDefault();
+    var _heroFind=null;
+    for(var _hfi=0;_hfi<Game_.units.length;_hfi++){var _hu=Game_.units[_hfi];if(_hu.isHero&&_hu.pid===Game_.playerPid&&!_hu.dying){_heroFind=_hu;break;}}
+    if(_heroFind){
+      for(var _hci=0;_hci<Game_.units.length;_hci++){if(Game_.units[_hci].pid===Game_.playerPid) Game_.units[_hci].sel=false;}
+      _heroFind.sel=true;UI._activeUnitId=_heroFind.id;
+      if(Renderer_){Game_.camera.x=_heroFind.x;Game_.camera.y=_heroFind.y;clampCam();}
+      UI.refreshSelection();UI.refreshUnitBar();
+    }
+    return;
+  }
+  if(Game_&&!e.ctrlKey){
+    var sel=[];
+    for(var i=0;i<Game_.units.length;i++){var u=Game_.units[i];if(u.sel&&u.pid===Game_.playerPid&&u.isHero&&!u.dying) sel.push(u);}
+    if(sel.length){
+      var hero=sel[0];
+      var _isAbilityKey=(k===_K.ability1||k===_K.ability2||k===_K.ability3||k===_K.ability4);
+      if(_isAbilityKey&&(hero.stunT>0||hero.rootT>0)){
+        e.preventDefault();
+        if(UI) UI.showHint('Оглушён — способности недоступны',1);
+        return;
+      }
+      if(k===_K.ability1){e.preventDefault();Game_.castAbility(hero,hero.heroAbilities[0].id);return;}
+      else if(k===_K.ability2){e.preventDefault();Game_.castAbility(hero,hero.heroAbilities[1].id);return;}
+      else if(k===_K.ability3){
+        e.preventDefault();
+        var abPassive=hero.heroAbilities[2];
+        if(abPassive) UI.showHint(t_(abPassive.k)+' (пассив, ур.'+(hero.abilityLevels[abPassive.id]||0)+'/3)',2);
+        return;
+      }
+      else if(k===_K.ability4){e.preventDefault();Game_.castAbility(hero,hero.heroAbilities[3].id);return;}
+    }
+    if(k===_K.attack&&!e.shiftKey){
+      if(Game_.hasSelectedCombat()){
+        self.clearPending('order');
+        self.pendingOrder='attack';
+        if(UI) UI.showOrderBar(t_('atkMove'));
+        e.preventDefault();
+      }
+    }
+    else if(k===_K.stop){
+      if(Game_.hasSelectedCombat()){
+        var nowS=performance.now();
+        var isDblS=(nowS-self._lastS<350);
+        self._lastS=nowS;
+        self.pendingOrder=null;if(UI) UI.hideOrderBar();
+        var n=Game_.stopSelected();
+        if(isDblS){
+          for(var _si2=0;_si2<Game_.units.length;_si2++){
+            var _su=Game_.units[_si2];
+            if(_su.sel&&_su.pid===Game_.playerPid&&_su.role!=='worker') _su.stance='aggressive';
+          }
+          if(UI) UI.showHint('Агрессивная стойка',1);
+        } else {
+          if(n&&UI) UI.showHint(t_('stopped')+' ×'+n,1);
+        }
+        e.preventDefault();
+      }
+    }
+    else if(k===_K.patrol){
+      if(Game_.hasSelectedCombat()){
+        self.clearPending('order');
+        self.pendingOrder='patrol';
+        if(UI) UI.showOrderBar(t_('patrol'));
+        e.preventDefault();
+      }
+    }
+  }
+});
+window.addEventListener('keyup',function(e){self.keys[e.key.toLowerCase()]=false;if(e.key==='Shift') self.shiftDown=false;if(e.key==='Escape') self._escDown=false;});
+canvas.addEventListener('touchstart',function(e){
+  if(!Game_) return;Audio.resume();self.isTouch=true;
+  var r=canvas.getBoundingClientRect();
+  if(e.touches.length===1){var tt=e.touches[0],tx=tt.clientX-r.left,ty=tt.clientY-r.top;self.mouseX=tx;self.mouseY=ty;self.mouseInside=true;self.touchStart={x0:tx,y0:ty,lastX:tx,lastY:ty,moved:false,t0:performance.now()};self.pinchDist=0;}
+  else if(e.touches.length===2){var t1=e.touches[0],t2=e.touches[1];self.pinchDist=Math.hypot(t2.clientX-t1.clientX,t2.clientY-t1.clientY);self.touchStart=null;}
+},{passive:true});
+
+            canvas.addEventListener('touchmove',function(e){
+      if(!Game_) return;e.preventDefault();self.isTouch=true;
+      var r=canvas.getBoundingClientRect();
+      if(e.touches.length===1&&self.touchStart){
+        var t=e.touches[0],cx=t.clientX-r.left,cy=t.clientY-r.top,dx=cx-self.touchStart.lastX,dy=cy-self.touchStart.lastY;
+        self.touchStart.lastX=cx;self.touchStart.lastY=cy;
+        if(Math.abs(cx-self.touchStart.x0)>8||Math.abs(cy-self.touchStart.y0)>8) self.touchStart.moved=true;
+        if(self.touchStart.moved){Game_.camera.x-=dx/Game_.camera.zoom;Game_.camera.y-=dy/Game_.camera.zoom;clampCam();}
+      } else if(e.touches.length===2){
+        var t1=e.touches[0],t2=e.touches[1],d=Math.hypot(t2.clientX-t1.clientX,t2.clientY-t1.clientY);
+        var cx2=(t1.clientX+t2.clientX)/2-r.left,cy2=(t1.clientY+t2.clientY)/2-r.top;
+        if(self.pinchDist>0&&Renderer_){var f=d/self.pinchDist,wp=Renderer_.s2w(cx2,cy2),minZ=getMinZoom();Game_.camera.zoom=cl(Game_.camera.zoom*f,minZ,3);Game_.camera.x=wp.x-(cx2-Renderer_.w/2)/Game_.camera.zoom;Game_.camera.y=wp.y-(cy2-Renderer_.h/2)/Game_.camera.zoom;clampCam();}
+        self.pinchDist=d;self.touchStart=null;
+      }
+    },{passive:false});
+    canvas.addEventListener('touchend',function(e){
+      if(!Game_) return;
+      if(e.touches.length>0){var t=e.touches[0],r=canvas.getBoundingClientRect(),tx=t.clientX-r.left,ty=t.clientY-r.top;self.touchStart={x0:tx,y0:ty,lastX:tx,lastY:ty,moved:false,t0:performance.now()};self.pinchDist=0;return;}
+      if(self.touchStart&&!self.touchStart.moved){
+        var tt=self.touchStart;
+        var dur=(performance.now()-(tt.t0||0));
+        if(dur>450){
+          self.mouseX=tt.x0;self.mouseY=tt.y0;self.mouseInside=true;
+          if(UI){UI._mobileTip=true;UI.updateWorldTip();
+            clearTimeout(UI._mobileTipTO);
+            UI._mobileTipTO=setTimeout(function(){UI._mobileTip=false;if(UI.$('world-tip'))UI.$('world-tip').classList.remove('show');},2500);
+          }
+          self._ignoreMouseUntil=performance.now()+500;
+          self.touchStart=null;self.pinchDist=0;return;
+        }
+        if(self.pendingRallyPoint){
+          var wprt=Renderer_.s2w(tt.x0,tt.y0);
+          var rb2=self.pendingRallyPoint;
+          if(!rb2.dead){rb2.rallyPoint={x:wprt.x,y:wprt.y};Audio.sfx('click');if(UI) UI.showHint('Точка сбора установлена',1.5);}
+          self.pendingRallyPoint=null;if(UI) UI.hideOrderBar();
+          self._ignoreMouseUntil=performance.now()+500;self.touchStart=null;self.pinchDist=0;return;
+        }
+        if(self.pendingTargetedAbility){
+          var pa=self.pendingTargetedAbility,hero=pa.hero,ab=pa.ab;
+          var wpt=Renderer_.s2w(tt.x0,tt.y0);
+          var bestT=null,bd=Infinity;
+          for(var ti=0;ti<Game_.units.length;ti++){var tu=Game_.units[ti];if(tu.team===hero.team||tu.dying) continue;if(ab.range&&Math.hypot(tu.x-hero.x,tu.y-hero.y)>ab.range+tu.radius) continue;var dd=(tu.x-wpt.x)*(tu.x-wpt.x)+(tu.y-wpt.y)*(tu.y-wpt.y);if(dd<bd){bd=dd;bestT=tu;}}
+          if(!bestT) for(var ti2=0;ti2<Game_.creeps.length;ti2++){var tc2=Game_.creeps[ti2];if(tc2.dying) continue;if(ab.range&&Math.hypot(tc2.x-hero.x,tc2.y-hero.y)>ab.range+tc2.radius) continue;var dd2=(tc2.x-wpt.x)*(tc2.x-wpt.x)+(tc2.y-wpt.y)*(tc2.y-wpt.y);if(dd2<bd){bd=dd2;bestT=tc2;}}
+          if(bestT){Game_.castAbility(hero,ab.id,bestT);}
+          self.pendingTargetedAbility=null;if(UI) UI.hideOrderBar();
+          self._ignoreMouseUntil=performance.now()+500;self.touchStart=null;self.pinchDist=0;return;
+        }
+        var pick=Game_.pickScreen(tt.x0,tt.y0);
+        var ownPick=(pick.unit&&pick.unit.pid===Game_.playerPid)||(pick.building&&pick.building.pid===Game_.playerPid);
+        var foreignPick=(pick.unit&&pick.unit.pid!==Game_.playerPid)||(pick.building&&pick.building.pid!==Game_.playerPid)||(pick.creep);
+        if(UI._placingKind){var wpt3=Renderer_.s2w(tt.x0,tt.y0);UI.tryPlaceAt(wpt3.x,wpt3.y);}
+        else if(foreignPick) Game_.handleLeftClick(tt.x0,tt.y0,false);
+        else if(ownPick) Game_.handleLeftClick(tt.x0,tt.y0,false);
+        else{
+          var hasSel=false;
+          for(var i=0;i<Game_.units.length;i++) if(Game_.units[i].sel&&Game_.units[i].pid===Game_.playerPid){hasSel=true;break;}
+          if(hasSel) Game_.handleRightClick(tt.x0,tt.y0);
+          else Game_.handleLeftClick(tt.x0,tt.y0,false);
+        }
+      }
+      self._ignoreMouseUntil=performance.now()+500;
+      self.touchStart=null;self.pinchDist=0;
+    });
+  },
+  updateCamera:function(dt){
+    if(!Game_) return;
+    var c=Game_.camera,spd=900/c.zoom*dt,dx=0,dy=0;
+    var K=(typeof Settings!=='undefined'&&Settings.keys)?Settings.keys:DEFAULT_KEYS;
+    if(this.keys[K.camUp]) dy-=1;
+    if(this.keys[K.camDown]) dy+=1;
+    if(this.keys[K.camLeft]) dx-=1;
+    if(this.keys[K.camRight]) dx+=1;
+    if(!this.isTouch&&!Settings._isMobile&&Settings.edgeScroll&&this.mouseInside&&Renderer_){
+      var _zone=Math.max(70,Math.min(120,Renderer_.w*0.06));
+      var _mx=this.mouseX,_my=this.mouseY,_w=Renderer_.w,_h=Renderer_.h;
+      var _ex=0,_ey=0;
+      if(_mx<_zone) _ex=-(1-_mx/_zone);
+      else if(_mx>_w-_zone) _ex=(_mx-(_w-_zone))/_zone;
+      if(_my<_zone) _ey=-(1-_my/_zone);
+      else if(_my>_h-_zone) _ey=(_my-(_h-_zone))/_zone;
+      _ex=Math.max(-1,Math.min(1,_ex));_ey=Math.max(-1,Math.min(1,_ey));
+      _ex=_ex*Math.abs(_ex);_ey=_ey*Math.abs(_ey);
+      if(_ex||_ey){dx+=_ex;dy+=_ey;}
+    }
+    if(dx||dy){
+      var len=Math.hypot(dx,dy)||1;
+      if(len>1){dx/=len;dy/=len;}
+      c.x+=dx*spd*1.15;c.y+=dy*spd*1.15;
+      clampCam();
+    }
+  }
+};
+function loop(now){
+  if(!lastT) lastT=now;
+  var dt=(now-lastT)/1000;
+  if(!isFinite(dt)||dt<0) dt=0.016;
+  dt=Math.min(0.1,dt);
+  lastT=now;
+  try{
+    if(Game_&&!Game_.paused){
+      Input.updateCamera(dt);
+      Game_.update(dt);
+      // ПАТЧ J-15: обновлять ухо раз в 3 кадра
+      if(Game_.camera){
+        if(!loop._earFrame) loop._earFrame=0;
+        loop._earFrame++;
+        if(loop._earFrame%3===0) Audio.setEar(Game_.camera.x,Game_.camera.y,Game_.camera.zoom);
+      }
+    }
+  }catch(e){ERR('update',e);}
+  try{
+    if(Renderer_&&Game_){
+      if(Renderer_.setFrameAlpha) Renderer_.setFrameAlpha(0.5);
+      Renderer_.draw();
+    }
+  }catch(e){ERR('draw',e);}
+  try{if(Game_&&UI) UI.update();}catch(e){ERR('UI',e);}
+  requestAnimationFrame(loop);
+}
+function boot(){
+  try{
+    UI=new UISys();
+    UI.applyLangUI();
+    Input.init(document.getElementById('game'));
+    document.addEventListener('visibilitychange',function(){
+      if(document.hidden){Audio.pauseAll();}
+      else{
+        Audio.resume();lastT=0;
+        // ПАТЧ J-14: сбросить хеш портрета при возврате
+        if(UI){UI._lastPortraitAuraHash=null;}
+      }
+    });
+    window.addEventListener('blur',function(){Audio.pauseAll();});
+    window.addEventListener('focus',function(){Audio.resume();lastT=0;});
+    UI.showScreen('menu');
+    requestAnimationFrame(loop);
+  }catch(e){ERR('boot',e);showError('Load: '+e.message);}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+else boot();
+
+      </script>
+</body>
+</html>
