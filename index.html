@@ -10792,7 +10792,18 @@ AIController.prototype.assignWorkers=function(){
       if(r.dead||r.amount<=0||r.falling) continue;
       if(r.kind!==wantKind) continue;
       if(!g.isExploredForTeam(self.team,r.x,r.y)) continue;
+      
+      
       if(r.kind==='gold'&&g.countGatherers(r)>=MAX_GATHER_PER_MINE) continue;
+// Проверка: рядом враг?
+var _danger=false;
+for(var _di=0;_di<g.units.length;_di++){
+  var _du=g.units[_di];
+  if(_du.team===self.team||_du.dying) continue;
+  if(Math.hypot(_du.x-r.x,_du.y-r.y)<350){_danger=true;break;}
+}
+if(_danger) continue;
+      
       var distHome=Math.hypot(r.x-self.homeX,r.y-self.homeY);
       if(distHome>maxDist) continue;
       var d=Math.hypot(r.x-wk.x,r.y-wk.y),sc=3000-d;
