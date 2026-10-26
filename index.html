@@ -6608,14 +6608,21 @@ Game.prototype.getRes=function(pid){
   if(maxFood>MAX_FOOD) maxFood=MAX_FOOD;
   return {gold:t.gold,wood:t.wood,food:food,maxFood:maxFood,pop:food,maxPop:maxFood};
 };
+
+      
 Game.prototype.getReservedPop=function(pid){
   var n=0;
   for(var i=0;i<this.buildings.length;i++){
     var b=this.buildings[i];if(b.pid!==pid||b.dead) continue;
     for(var qi=0;qi<b.queue.length;qi++){n+=(FOOD_COST[b.queue[qi].role]||1);}
+    if(b.reviveQueue){
+      for(var rqi=0;rqi<b.reviveQueue.length;rqi++){n+=(FOOD_COST[b.reviveQueue[rqi].role]||1);}
+    }
   }
   return n;
 };
+
+      
 Game.prototype.addRes=function(pid,g,w){
   if(typeof pid!=='number' && typeof pid!=='string') pid=0;
   if(!this.teams[pid]||typeof this.teams[pid]!=='object') this.teams[pid]={gold:0,wood:0};
@@ -9630,7 +9637,10 @@ Game.prototype.handleLeftClick=function(sx,sy,add){
   if(!hasOwnSel){
     for(i=0;i<this.buildings.length;i++) if(this.buildings[i].sel&&this.buildings[i].pid===this.playerPid){hasOwnSel=true;break;}
   }
-  if((pick.unit&&pick.unit.pid!==this.playerPid)||(pick.building&&pick.building.pid!==this.playerPid)){
+
+  
+  if((pick.unit&&pick.unit.pid!==this.playerPid&&pick.unit.team!==this.playerTeam)||(pick.building&&pick.building.pid!==this.playerPid&&pick.building.team!==this.playerTeam)){
+    
     if(hasOwnSel){
       var target=pick.unit||pick.building;
       var sel=[];
