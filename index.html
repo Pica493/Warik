@@ -10926,11 +10926,14 @@ AIController.prototype.tryBuild=function(){
       var _md=Math.hypot(_mr.x-th.x,_mr.y-th.y);
       if(_md<_nmD){_nmD=_md;_nearestMine=_mr;}
     }
-    var _baseAng=0;
-    if(_nearestMine) _baseAng=Math.atan2(_nearestMine.y-th.y,_nearestMine.x-th.x);
-    else _baseAng=Math.atan2(g.H/2-th.y,g.W/2-th.x);
-    var ang=_baseAng+(Math.random()-0.5)*1.05;
-    var r=180+Math.random()*120;
+
+    
+// Ищем место по кругу (360 градусов), а не только в сторону шахты
+var ang=Math.random()*Math.PI*2;
+// Увеличиваем радиус поиска: от 220 до 450
+var r=220+Math.random()*230;
+
+    
     var bx=th.x+Math.cos(ang)*r,by=th.y+Math.sin(ang)*r;
     if(bx<50||by<50||bx>g.W-50||by>g.H-50) continue;
     if(g.isOnPath(bx,by,90)) continue;
