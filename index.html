@@ -10883,6 +10883,34 @@ AIController.prototype.tryBuild=function(){
   }
   var totalBuildings=mine.length;
   if(totalBuildings>=MAX_BOT_BUILDINGS) return;
+
+// Если бота атакуют — строим башни (до 4 штук)
+if(this._underHeavyAttack || this.underAttack){
+  if((builtCount.tower||0) < 4 && res.gold >= this.race.buildings.tower.gold && res.wood >= this.race.buildings.tower.wood){
+    var _twDef = this.race.buildings.tower;
+    var _twW = null;
+    for(var _twI=0;_twI<g.units.length;_twI++){ var _twU=g.units[_twI]; if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying && !_twU.buildTarget && !_twU.repairTarget){ _twW=_twU; break; } }
+    if(_twW && th){
+      for(var _twA=0;_twA<10;_twA++){
+        var _angT = Math.random()*Math.PI*2;
+        var _tx = th.x + Math.cos(_angT)*200;
+        var _ty = th.y + Math.sin(_angT)*200;
+        var _okT = true;
+        if(_tx<50||_ty<50||_tx>g.W-50||_ty>g.H-50) _okT=false;
+        if(_okT) for(var _obT=0;_obT<g.buildings.length;_obT++){ var _bbT=g.buildings[_obT]; if(Math.hypot(_bbT.x-_tx,_bbT.y-_ty)<_bbT.radius+110){_okT=false;break;} }
+        if(_okT){
+          g.subRes(this.pid,_twDef.gold,_twDef.wood);
+          var _nbT=new Building(_tx,_ty,this.team,_twDef,this.raceId);
+          _nbT.completed=false;_nbT.buildProgress=0;_nbT.owner='bot';_nbT.pid=this.pid;this.aiId=this.aiId;
+          g.buildings.push(_nbT);g.navDirty=true;
+          _twW.buildTarget=_nbT;_twW.gatherTarget=null;_twW.moveTo=null;_twW._path=null;_twW._pathIdx=0;
+          return;
+        }
+      }
+    }
+  }
+}
+  
   if(!th){
     var thDef0=this.race.buildings.townhall;
     if(res.gold<thDef0.gold||res.wood<thDef0.wood) return;
@@ -11044,9 +11072,17 @@ AIController.prototype.tryTrain=function(){
   if(ec.siege>0){ desired.cav+=0.05; }
   if(thLvl<2){ desired.cav=0; desired.siege=0; }
   if(thLvl<3){ desired.elite=0; desired.heal=0; desired.fly=0; }
+  
+  
   var roles=[];
+if(this.underAttack){
+  // Под атакой не тратим золото на рабочих, копим на армию!
+  if(workerCount<6) roles.push('worker'); 
+} else {
   if(workerCount<14) roles.push('worker','worker');
   else if(workerCount<18) roles.push('worker');
+}
+  
   var combatTotal=totalCombat;
   var bestRole=null,bestDeficit=0;
   for(var rr in desired){
