@@ -9855,13 +9855,18 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
       var u2=sel[wi];
       if(u2.role==='worker'){
         u2.target=null;u2.lockedTarget=null;u2.moveTo=null;u2.buildTarget=null;u2.repairTarget=null;u2.demolishTarget=null;u2.carrying=null;u2.carryAmt=0;u2.gatherProgress=0;u2.gatherAnimT=0;u2._stuckTimer=0;u2._insideMine=false;u2._mineSlot=-1;u2._waitingForMine=false;u2._path=null;u2._pathIdx=0;
+       
+        
         if(bestR.kind==='gold'&&currentGatherers>=MAX_GATHER_PER_MINE){
-          u2.gatherTarget=bestR;u2._assignedMine=bestR;
-          this.notify(t_('mineFull'));
-        } else {
-          u2.gatherTarget=bestR;
-          if(bestR.kind==='gold'){ u2._assignedMine=bestR; currentGatherers++; }
-        }
+  u2.gatherTarget=null; u2._assignedMine=null; u2.moveTo=null; u2._path=null; u2._pathIdx=0;
+  this.notify(t_('mineFull'));
+} else {
+  u2.gatherTarget=bestR;
+  if(bestR.kind==='gold'){ u2._assignedMine=bestR; currentGatherers++; }
+}
+
+
+        
       } else { u2.moveTo={x:wx,y:wy}; u2.target=null; u2.lockedTarget=null; u2._path=null; u2._pathIdx=0; }
     }
     Audio.sfx('click');return;
@@ -10903,12 +10908,35 @@ AIController.prototype.tryBuild=function(){
   var _unlocked=BUILDING_UNLOCK[_thLvlNow]||BUILDING_UNLOCK[1];
   var needCount={};
   var nextKind=null;
-  for(var oi=0;oi<order.length;oi++){
-    var k=order[oi];
-    if(_unlocked.indexOf(k)<0) continue;
-    needCount[k]=(needCount[k]||0)+1;
-    if((builtCount[k]||0)<needCount[k]){ nextKind=k; break; }
+
+  
+  var _curWoodWorkers = 0;
+for(var _wi=0;_wi<g.units.length;_wi++){
+  var _wu=g.units[_wi];
+  if(_wu.pid===this.pid && _wu.role==='worker' && !_wu.dying && _wu.gatherTarget && _wu.gatherTarget.kind==='tree') _curWoodWorkers++;
+}
+
+for(var oi=0;oi<order.length;oi++){
+  var k=order[oi];
+  if(_unlocked.indexOf(k)<0) continue;
+  
+  // Умные лесопилки
+  if(k==='lumber'){
+    var _lumberCount = builtCount.lumber || 0;
+    // Если 1 лесопилка уже есть, строим вторую ТОЛЬКО если рабочих на дереве > 6
+    if(_lumberCount >= 1 && (_lumberCount >= 2 || _curWoodWorkers <= 6)) continue;
   }
+  
+  // Ограничение казарм по TH
+  if(k==='barracks'){
+    var _maxBrk = (g.getTHLevel(this.pid) === 1) ? 1 : (g.getTHLevel(this.pid) === 2) ? 2 : 3;
+    if((builtCount[k]||0) >= _maxBrk) continue;
+  }
+
+  needCount[k]=(needCount[k]||0)+1;
+  if((builtCount[k]||0)<needCount[k]){ nextKind=k; break; }
+}
+  
   var foodState=res.food,foodMax=res.maxFood,foodReserved=g.getReservedPop(this.pid);
   var foodNearCap=(foodState+foodReserved+8)>=foodMax;
   if(foodNearCap && foodMax<MAX_FOOD && nextKind!=='house') nextKind='house';
