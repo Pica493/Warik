@@ -649,7 +649,9 @@ var SFX_RATE={'sword':1,'arrow':1,'chop':1,'mine':1,'gold':1,'wood':1,'build':1,
       if(r<0.4) s.sfx('bird');
       else if(r<0.7) s.sfx('wind');
     },3800);},
-  stopMusic:function(){if(this.musTimer){clearInterval(this.musTimer);this.musTimer=null;}if(this.ambTimer){clearInterval(this.ambTimer);this.ambTimer=null;}}
+    stopMusic:function(){if(this.musTimer){clearInterval(this.musTimer);this.musTimer=null;}if(this.ambTimer){clearInterval(this.ambTimer);this.ambTimer=null;}},
+  // ПАТЧ J-34: сброс троттлинга звуков при новой игре
+  resetCooldowns:function(){this._lastSfx={};}
 };
 
       var TC=['#3a7adf','#d03a3a','#3aa03a','#d0c030','#a03aa0','#30c0c0'];
@@ -5072,8 +5074,10 @@ function drawUnitIntoCanvas(cv,race,role,team,dir,scaleFit,heroType){
   var drawW=sp.width*s,drawH=sp.height*s;
   var startX=(cv.width-drawW)/2;
   var startY=(cv.height-drawH)/2;
+  // ПАТЧ J-20d: варианты героев — без доп. ног
+  var _isVariantHeroIcon=(role==='hero'&&(heroType==='inquisitor'||heroType==='shaman'||heroType==='hunter'));
   var legDef=getLeg(role);
-  if(legDef&&role!=='cav'&&role!=='siege'&&role!=='fly'){
+  if(legDef&&role!=='cav'&&role!=='siege'&&role!=='fly'&&!_isVariantHeroIcon){
     var legW=legDef.w*s*0.9,legH=legDef.h*s*0.85,legSpread=legDef.spread*s*0.8;
     var legBottomY=startY+drawH*0.98,legTopY=legBottomY-legH,pcx=cv.width/2;
     ctx.fillStyle='#3a2010';ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(0.5,s*0.6);
@@ -5124,7 +5128,6 @@ function drawUnitIntoCanvas(cv,race,role,team,dir,scaleFit,heroType){
       drawWoodWheelIcon(wheelX2,wheelY,wR3);
     }
   }
-  var _isVariantHeroIcon=(role==='hero'&&(heroType==='inquisitor'||heroType==='shaman'||heroType==='hunter'));
   if(role!=='cav'&&role!=='siege'&&role!=='fly'&&!_isVariantHeroIcon&&Renderer_){
     var tempU={role:role,race:race,isHero:(role==='hero'),team:team,walkPhase:0,walkOffset:0,moving:false,attackT:0,chopT:0,castT:0,animT:0,x:0,y:0};
     var pObj={x:cv.width/2,y:startY+drawH};
@@ -5146,8 +5149,10 @@ function getUnitIconURL(race,role,heroType){
   var pad=6;
   var s=Math.min((c.width-pad*2)/sp.width,(c.height-pad*2)/sp.height);
   var dw=sp.width*s,dh=sp.height*s,dx=(c.width-dw)/2,dy=(c.height-dh)/2;
+    // ПАТЧ J-20c: варианты героев — без доп. ног
+  var _isVariantHeroIcon2=(role==='hero'&&(heroType==='inquisitor'||heroType==='shaman'||heroType==='hunter'));
   var legDef=getLeg(role);
-  if(legDef&&role!=='cav'&&role!=='siege'&&role!=='fly'){
+  if(legDef&&role!=='cav'&&role!=='siege'&&role!=='fly'&&!_isVariantHeroIcon2){
     var legW=legDef.w*s*0.9,legH=legDef.h*s*0.85,legSpread=legDef.spread*s*0.8;
     var legBottomY=dy+dh,legTopY=legBottomY-legH,pcx=c.width/2;
     ctx.fillStyle='#3a2010';ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(0.5,s*0.6);
@@ -5187,8 +5192,7 @@ function getUnitIconURL(race,role,heroType){
       drawWoodWheelIcon2(wheelX2b,wheelY2,wR4);
     }
   }
-  var _isVariantHeroIcon2=(role==='hero'&&(heroType==='inquisitor'||heroType==='shaman'||heroType==='hunter'));
-  if(role!=='cav'&&role!=='siege'&&role!=='fly'&&!_isVariantHeroIcon2){
+    if(role!=='cav'&&role!=='siege'&&role!=='fly'&&!_isVariantHeroIcon2){
     var tempU={role:role,race:race,isHero:(role==='hero'),team:0,walkPhase:0,walkOffset:0,moving:false,attackT:0,chopT:0,castT:0,animT:0,x:0,y:0};
     var pObj={x:c.width/2,y:dy+dh};
     var hand=Renderer.prototype._armsCtx.call(null,ctx,tempU,pObj,s,false,1);
@@ -6872,7 +6876,8 @@ Game.prototype.initFog=function(){
 Game.prototype.updateFog=function(){
   var cs=this.fogCellSize,c=this.fogCols,r=this.fogRows;
   var self=this;
-  for(var t in this.teamVis){for(var i=0;i<this.teamVis[t].length;i++) this.teamVis[t][i]=0;}
+    // ПАТЧ J-27: .fill() в 5-10 раз быстрее ручного цикла
+  for(var t in this.teamVis){this.teamVis[t].fill(0);}
   function rev(team,cx,cy,rad){
     var arr=self.teamVis[team];if(!arr) return;
     var x0=Math.max(0,cx-rad),x1=Math.min(c-1,cx+rad);
@@ -7225,10 +7230,11 @@ Game.prototype._markAutoAcquire=function(u){
       }
     }
   }
-  var i;
-  for(i=0;i<this.units.length;i++){try{if(!this.units[i].dead) this.updateUnit(this.units[i],dt);}catch(e){ERR('updateUnit',e);}}
-  for(i=0;i<this.creeps.length;i++){try{if(!this.creeps[i].dead) this.updateCreep(this.creeps[i],dt);}catch(e){ERR('updateCreep',e);}}
-  for(i=0;i<this.buildings.length;i++){try{if(!this.buildings[i].dead) this.updateBuilding(this.buildings[i],dt);}catch(e){ERR('updateBuilding',e);}}
+    var i;
+  // ПАТЧ J-28: один try на массив вместо try на элемент
+  try{for(i=0;i<this.units.length;i++){if(!this.units[i].dead) this.updateUnit(this.units[i],dt);}}catch(e){ERR('updateUnits',e);}
+  try{for(i=0;i<this.creeps.length;i++){if(!this.creeps[i].dead) this.updateCreep(this.creeps[i],dt);}}catch(e){ERR('updateCreeps',e);}
+  try{for(i=0;i<this.buildings.length;i++){if(!this.buildings[i].dead) this.updateBuilding(this.buildings[i],dt);}}catch(e){ERR('updateBuildings',e);}
   for(i=0;i<this.resources.length;i++){
     var r=this.resources[i];if(r.dead) continue;
     if(r.falling){
@@ -7469,8 +7475,10 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
     }
   }
   if(u.dying){u.deathT+=dt;if(u.deathT>1.6){u.dead=true;if(!u._isSummon)this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));}return;}
-  if(u.hp<=0){
-    u.dying=true;u.deathT=0;u.deathDir=(u.dir===DIR.LEFT)?-1:1;
+    if(u.hp<=0){
+    u.dying=true;u.deathT=0;
+    // ПАТЧ J-29: при UP/DOWN — случайно влево/вправо, не всегда вправо
+    u.deathDir=(u.dir===DIR.LEFT)?-1:(u.dir===DIR.RIGHT)?1:((u.id%2)?1:-1);
     if(u._isSummon){return;}
     this.spawnParticles(u.x,u.y,'#8a1010',10);
     if(this.stats[u.pid]) this.stats[u.pid].unitsLost++;
@@ -7665,8 +7673,10 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
   if(c.stunT>0) c.stunT-=dt;
   if(c.bleedT>0){c.bleedT-=dt;c.hp-=(c.bleedDmg||0)*dt;if(c.bleedT<=0)c.bleedDmg=0;}
   if(c.dying){c.deathT+=dt;if(c.deathT>1.2) c.dead=true;return;}
-  if(c.hp<=0){
-    c.dying=true;c.deathT=0;c.deathDir=(c.dir===DIR.LEFT)?-1:1;
+    if(c.hp<=0){
+    c.dying=true;c.deathT=0;
+    // ПАТЧ J-29b
+    c.deathDir=(c.dir===DIR.LEFT)?-1:(c.dir===DIR.RIGHT)?1:((c.id%2)?1:-1);
     this.spawnParticles(c.x,c.y,'#8a3020',12);
     Audio.sfx('death',c.x,c.y);
     if(c.lastAttacker){
@@ -7827,9 +7837,10 @@ Game.prototype.updateBuilding=function(b,dt){
       b.towerUpgrade=b._pendingUpgrade;
       b._pendingUpgrade=null;
       var tuDef=TOWER_UPGRADES[b.race]&&TOWER_UPGRADES[b.race][b.towerUpgrade];
-      if(tuDef){
+            if(tuDef){
         b.atk=tuDef.atk;b.atkCdBase=tuDef.atkCd;b.rng=tuDef.rng;
-        if(tuDef.hpBonus) b.hp=Math.min(b.maxHp,b.hp+tuDef.hpBonus);
+        // ПАТЧ J-22: hpBonus увеличивает максимум
+        if(tuDef.hpBonus){b.maxHp+=tuDef.hpBonus;b.hp=Math.min(b.maxHp,b.hp+tuDef.hpBonus);}
       }
       if(b.owner==='player'&&tuDef){
         this.notify('Башня улучшена: '+(LC==='en'?tuDef.nameEn:tuDef.name));
@@ -8880,10 +8891,21 @@ Game.prototype.checkVictory=function(){
   }
   var cnt=0;for(var k in teams) cnt++;
   if(cnt<2) return;
+    // ПАТЧ J-23: поражение только если у ВСЕЙ команды нет TH
   if(!this._canRebuildTH(this.playerPid)){
-    if(!this.gameOver) Audio.stopMusic();
-    this.gameOver=true;this.result='lose';
-    return;
+    var _myTeamMembers=teamMembers[this.playerTeam]||[];
+    var _teamAlive=false;
+    for(var _tmi=0;_tmi<_myTeamMembers.length;_tmi++){
+      var _tmPid=_myTeamMembers[_tmi];
+      if(_tmPid===this.playerPid) continue;
+      if(this.config.slots[_tmPid].type==='empty') continue;
+      if(this._canRebuildTH(_tmPid)){_teamAlive=true;break;}
+    }
+    if(!_teamAlive){
+      if(!this.gameOver) Audio.stopMusic();
+      this.gameOver=true;this.result='lose';
+      return;
+    }
   }
   var allEnemyDead=true;
   for(var k2 in teams){
@@ -9042,8 +9064,10 @@ Game.prototype.findVisibleResourceForWorker=function(u,kind,radius){
     hero.invulT=3;setCd();
     this.floaters.push(new Floater(hero.x,hero.y-55,'Щит','#ffe9a8'));
     burst(hero.x,hero.y-20,'#ffe9a8',48,180,80);
-    for(var ds=0;ds<3;ds++){
+        for(var ds=0;ds<3;ds++){
       (function(ring){setTimeout(function(){
+        // ПАТЧ J-30: не пылить после конца игры
+        if(self.gameOver) return;
         for(var kk=0;kk<24;kk++){var a=(kk/24)*TAU;self.particles.spawn(hero.x+Math.cos(a)*12,hero.y-20+Math.sin(a)*12,Math.cos(a)*80,Math.sin(a)*80,0.6,'#fff8d0',3);}
       },ring*110);})(ds);
     }
@@ -9401,7 +9425,7 @@ Game.prototype.findVisibleResourceForWorker=function(u,kind,radius){
     }
     setCd();this.floaters.push(new Floater(hero.x,hero.y-55,t_('e_sha_totem'),'#c02020'));
     Audio.sfx('abil_spirits',hero.x,hero.y);
-    setTimeout(function(){Audio.sfx('abil_heal_lum',hero.x,hero.y);},120);
+        setTimeout(function(){if(!self.gameOver) Audio.sfx('abil_heal_lum',hero.x,hero.y);},120);
   }
   else if(abilId==='sha_harvest'){
     var _hTgt=forcedTarget;
@@ -10076,13 +10100,13 @@ Game.prototype.loadFrom=function(data){
     b._towerUpgradeTotal=bd._towerUpgradeTotal||0;b.bleedT=bd.bleedT||0;b.bleedDmg=bd.bleedDmg||0;
     if(bd.rallyPoint) b.rallyPoint={x:bd.rallyPoint.x,y:bd.rallyPoint.y};
     if(bd.hpBonusApplied) b._hpBonusApplied={bonus:bd.hpBonusApplied.bonus,level:bd.hpBonusApplied.level};
+   
+        // ПАТЧ J-21: не применяем статы, пока апгрейд не завершён
     if(b.towerUpgrade){
       var tuL=TOWER_UPGRADES[bd.race]&&TOWER_UPGRADES[bd.race][b.towerUpgrade];
       if(tuL){b.atk=tuL.atk;b.atkCdBase=tuL.atkCd;b.rng=tuL.rng;}
-    } else if(b._towerUpgrading && b._pendingUpgrade){
-      var tuP=TOWER_UPGRADES[bd.race]&&TOWER_UPGRADES[bd.race][b._pendingUpgrade];
-      if(tuP){b.atk=tuP.atk;b.atkCdBase=tuP.atkCd;b.rng=tuP.rng;}
     }
+    
     this.buildings.push(b);bldMap[bd.id||i]=b;
   }
   for(var _bi2=0;_bi2<this.buildings.length;_bi2++){
@@ -11013,8 +11037,12 @@ var r=220+Math.random()*230;
 AIController.prototype.tryTrain=function(){
   var g=this.g,res=g.getRes(this.pid),reserved=g.getReservedPop(this.pid);
   // Q11.22: лимит 290
+    // ПАТЧ J-25: считаем только живых (не dying/dead)
   var _nonSummon=0;
-  for(var _nsi=0;_nsi<g.units.length;_nsi++) if(!g.units[_nsi]._isSummon) _nonSummon++;
+  for(var _nsi=0;_nsi<g.units.length;_nsi++){
+    var _nsu=g.units[_nsi];
+    if(!_nsu._isSummon && !_nsu.dying && !_nsu.dead) _nonSummon++;
+  }
   if(_nonSummon>=290) return;
   var buildings=[];
   for(var i=0;i<g.buildings.length;i++){var b=g.buildings[i];if(b.pid!==this.pid||!b.completed||b.dead) continue;if(b.upgrading) continue;if(b.techUpgrading) continue;buildings.push(b);}
@@ -11713,8 +11741,9 @@ AIController.prototype.heroRetreat=function(){
         var d=(b.x-h.x)*(b.x-h.x)+(b.y-h.y)*(b.y-h.y);
         if(d<bd){bd=d;th=b;}
       }
-      if(th){
+            if(th){
         h.retreating=true;
+        h._retreating=true;  // ПАТЧ J-24: рабочий флаг
         h.moveTo={x:th.x+(Math.random()-0.5)*60,y:th.y+(Math.random()-0.5)*60};
         h.target=null;h.lockedTarget=null;h.attackMoveTo=null;h.patrolRoute=null;
         h._path=null;h._pathIdx=0;
@@ -12071,7 +12100,7 @@ AIController.prototype.healAlliesOutOfCombat=function(){
       tx=cl(mainTH2.x+Math.cos(awayAng)*900,120,g.W-120);
       ty=cl(mainTH2.y+Math.sin(awayAng)*900,120,g.H-120);
     }
-  } else {
+    } else {
     var found=false;
     for(var att=0;att<12;att++){
       tx=120+Math.random()*(g.W-240);
@@ -12081,6 +12110,21 @@ AIController.prototype.healAlliesOutOfCombat=function(){
         var b4=g.buildings[bi4];
         if(b4.dead) continue;
         if(Math.hypot(b4.x-tx,b4.y-ty)<250){ok=false;break;}
+      }
+      // ПАТЧ J-26: не строить TH под врагом
+      if(ok){
+        for(var _enU_I=0;_enU_I<g.units.length;_enU_I++){
+          var _enU=g.units[_enU_I];
+          if(_enU.team===this.team||_enU.dying) continue;
+          if(Math.hypot(_enU.x-tx,_enU.y-ty)<400){ok=false;break;}
+        }
+      }
+      if(ok){
+        for(var _enB_I=0;_enB_I<g.buildings.length;_enB_I++){
+          var _enB=g.buildings[_enB_I];
+          if(_enB.team===this.team||_enB.dead) continue;
+          if(Math.hypot(_enB.x-tx,_enB.y-ty)<600){ok=false;break;}
+        }
       }
       if(ok){found=true;break;}
     }
@@ -12459,11 +12503,13 @@ AIController.prototype.getEnemyComposition=function(){
     var bobV=Math.abs(Math.sin(wpc*4))*1.6*z;
     ctx.translate(0,-bobV);
   }
-  if(u.role==='fly'&&!u.dying){
+    if(u.role==='fly'&&!u.dying){
     var hover=Math.sin(u.animT*2.2+u.walkOffset)*4*z;
     bob=hover-2*z;
   }
-  if(getLeg(u.role) && u.role!=='cav' && u.role!=='siege' && u.role!=='fly'){
+  // ПАТЧ J-20: у вариантов героев ноги уже в спрайте
+  var _isVariantHero=(u.isHero&&(u.heroType==='inquisitor'||u.heroType==='shaman'||u.heroType==='hunter'));
+  if(getLeg(u.role) && u.role!=='cav' && u.role!=='siege' && u.role!=='fly' && !_isVariantHero){
     if(flipX){ctx.save();ctx.translate(p.x,0);ctx.scale(-1,1);this._legs(u,{x:0,y:p.y},s);ctx.restore();}
     else this._legs(u,p,s);
   }
@@ -12515,8 +12561,7 @@ AIController.prototype.getEnemyComposition=function(){
       drawWoodWheelRt(wc2,wy2,wR3,wheelRot);
     }
   }
-  var _isVariantHero=(u.isHero&&(u.heroType==='inquisitor'||u.heroType==='shaman'||u.heroType==='hunter'));
-  if(u.role!=='cav'&&u.role!=='siege'&&u.role!=='fly'&&!_isVariantHero){
+    if(u.role!=='cav'&&u.role!=='siege'&&u.role!=='fly'&&!_isVariantHero){
     this._arms(u,p,s,flipX);
     if(u._handScreenX!==null && u._handScreenX!==undefined){
       var atk2=Math.max(0,Math.min(1,u.attackT||0)),chop2=Math.max(0,Math.min(1,u.chopT||0)),cast2=Math.max(0,Math.min(1,u.castT||0));
@@ -13483,6 +13528,8 @@ UISys.prototype._renderKeySettings=function(){
 
 UISys.prototype._showWc3Tooltip=function(btn,text){
   var tip=this.$('wc3-tooltip');if(!tip||!text) return;
+  // ПАТЧ J-33: кеш — не перестраивать HTML на каждый hover
+  if(btn._cachedTip===text && btn._cachedHtml){tip.innerHTML=btn._cachedHtml;this._positionWc3Tooltip(btn);return;}
   var lines=String(text).split('\n').filter(function(s){return s.length>0;});
   if(!lines.length){tip.classList.remove('show');return;}
   var title=lines[0];
@@ -13539,7 +13586,16 @@ UISys.prototype._showWc3Tooltip=function(btn,text){
     _repl(/(^|[\s.,;:?«»"()])(Мана|Mana)\s+(\d+)/gi,'mana');
     html+='<div class="tt-desc">'+descHtml+'</div>';
   }
+    btn._cachedTip=text;
+  btn._cachedHtml=html;
   tip.innerHTML=html;
+  tip.classList.add('show');
+  this._positionWc3Tooltip(btn);
+};
+
+// ПАТЧ J-33: вынесено для переиспользования
+UISys.prototype._positionWc3Tooltip=function(btn){
+  var tip=this.$('wc3-tooltip');if(!tip) return;
   tip.classList.add('show');
   var r=btn.getBoundingClientRect();
   var tw=tip.offsetWidth,th=tip.offsetHeight;
@@ -13742,7 +13798,7 @@ UISys.prototype.startGame=function(){
     this._gameOverShown=false;this._lastActionsHash='';this._lastUnitBarHash='';this._activeUnitId=null;
     this._inspectEnt=null;this._abilityButtons=[];this._lastPortraitAuraHash=null;
     centerCam();
-    Audio.init();Audio.resume();Audio.startMusic(map.biome);
+        Audio.init();Audio.resume();Audio.resetCooldowns();Audio.startMusic(map.biome);
     this.showHint(t_('startHint')+' · '+t_('cam_hint'),6);
   }catch(e){ERR('startGame',e);alert('Ошибка: '+e.message);}
 };
@@ -14006,8 +14062,10 @@ UISys.prototype.cycleActiveUnit=function(dir){
       var pad=14;
       var s=Math.min((cv.width-pad*2)/sp.width,(cv.height-pad*2)/sp.height);
       var dw=sp.width*s,dh=sp.height*s,dx=(cv.width-dw)/2,dy=(cv.height-dh)/2;
+            // ПАТЧ J-20b: варианты героев — без доп. ног
+      var _isVariantHeroP=(ent.isHero&&(ent.heroType==='inquisitor'||ent.heroType==='shaman'||ent.heroType==='hunter'));
       var legDef=getLeg(ent.role);
-      if(legDef&&ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'){
+      if(legDef&&ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'&&!_isVariantHeroP){
         var legW=legDef.w*s*0.9,legH=legDef.h*s*0.85,legSpread=legDef.spread*s*0.8;
         var legBottomY=dy+dh,legTopY=legBottomY-legH,pcx=cv.width/2;
         ctx.fillStyle='#3a2010';ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(0.5,s*0.6);
@@ -14039,8 +14097,7 @@ UISys.prototype.cycleActiveUnit=function(dir){
         };
         if(ent.race!=='sylvanid'){drawW2(wheelX1b,wheelY2,wR2);drawW2(wheelX2b,wheelY2,wR2);}
       }
-      var _isVariantHeroP=(ent.isHero&&(ent.heroType==='inquisitor'||ent.heroType==='shaman'||ent.heroType==='hunter'));
-      if(ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'&&Renderer_&&!_isVariantHeroP){
+            if(ent.role!=='cav'&&ent.role!=='siege'&&ent.role!=='fly'&&Renderer_&&!_isVariantHeroP){
         var tempU={role:ent.role,race:ent.race,isHero:ent.isHero,team:ent.team,walkPhase:0,walkOffset:0,moving:false,attackT:0,chopT:0,castT:0,animT:0,x:0,y:0};
         var pObj={x:cv.width/2,y:dy+dh};
         var hand=Renderer_._armsCtx(ctx,tempU,pObj,s,false,1);
@@ -15424,6 +15481,9 @@ UISys.prototype.drawMinimap=function(){
 };
 UISys.prototype._showUnitHoverTip=function(){
   if(!Game_||!Renderer_) return;
+  // ПАТЧ J-32: не пересчитывать pickScreen, если мышь не двигалась
+  if(this._lastHoverX===Input.mouseX && this._lastHoverY===Input.mouseY) return;
+  this._lastHoverX=Input.mouseX;this._lastHoverY=Input.mouseY;
   var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
   var id=pick.unit?pick.unit.id:0;
   if(this._lastHoverUnitId===id) return;
@@ -15885,7 +15945,8 @@ canvas.addEventListener('touchstart',function(e){
     if(this.keys[K.camLeft]) dx-=1;
     if(this.keys[K.camRight]) dx+=1;
     if(!this.isTouch&&!Settings._isMobile&&Settings.edgeScroll&&this.mouseInside&&Renderer_){
-      var _zone=Math.max(70,Math.min(120,Renderer_.w*0.06));
+            // ПАТЧ J-31: на узких экранах не «съедаем» половину
+      var _zone=Math.max(40,Math.min(90,Renderer_.w*0.045));
       var _mx=this.mouseX,_my=this.mouseY,_w=Renderer_.w,_h=Renderer_.h;
       var _ex=0,_ey=0;
       if(_mx<_zone) _ex=-(1-_mx/_zone);
