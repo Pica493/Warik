@@ -956,9 +956,9 @@ var RACE_SKIN={
 };
 var SPRITES={};
 function makeCv(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c;}
-var LEG_DEFS={worker:{w:6,h:14,spread:7},melee:{w:6,h:15,spread:8},ranged:{w:6,h:14,spread:7},
-  spear:{w:6,h:14,spread:7},heal:{w:6,h:14,spread:7},siege:{w:8,h:12,spread:12},
-  elite:{w:7,h:16,spread:9},hero:{w:8,h:17,spread:10},cav:{w:5,h:12,spread:22,count:4}};
+var LEG_DEFS={worker:{w:5,h:10,spread:6},melee:{w:5,h:11,spread:7},ranged:{w:5,h:10,spread:6},
+  spear:{w:5,h:10,spread:6},heal:{w:5,h:10,spread:6},siege:{w:8,h:12,spread:12},
+  elite:{w:6,h:12,spread:8},hero:{w:7,h:13,spread:9},cav:{w:5,h:12,spread:22,count:4}};
 function getLeg(role){if(role==='fly') return null;return LEG_DEFS[role]||LEG_DEFS.melee;}
 function roundRect(ctx,x,y,w,h,r){
   ctx.beginPath();
@@ -1665,7 +1665,7 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.fillStyle='#5adf5a';
   ctx.beginPath();ctx.ellipse(cx-6,headCY-headR-2,2.6,1.5,-0.4,0,TAU);ctx.fill();ctx.strokeStyle='#0a2a08';ctx.lineWidth=0.5;ctx.stroke();
   ctx.beginPath();ctx.ellipse(cx+4,headCY-headR-5,2.4,1.4,0.6,0,TAU);ctx.fill();ctx.stroke();
-  var bowX=cx+20,bowY=baseY-34;
+  var bowX=cx+8,bowY=baseY-34;
   ctx.strokeStyle='#5a3a15';ctx.lineWidth=2.6;ctx.lineCap='round';
   ctx.beginPath();ctx.arc(bowX+2,bowY,15,-Math.PI*0.65,Math.PI*0.65);ctx.stroke();
   ctx.strokeStyle='#2a1508';ctx.lineWidth=0.9;
@@ -1887,23 +1887,39 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.quadraticCurveTo(cx+headR+2,headY-headR-2,cx+headR+1,headY+headR-2);
   ctx.stroke();
 }
+else if(heroType==='shaman'){
+  /* ПАТЧ 7.1: геометрия приведена к side-версии.
+     - голова выше (28 вместо 34) — как в drawShamanSide (там 26 при baseY=86)
+     - ряса длиннее (bh+13 вместо bh+4) — скрывает ноги почти до пола, как в side
+     - посох тянется от головы до земли (длина ~60) с черепом на вершине — как в side */
+  var _shHeadY = bodyBaseY-bh-14;   // = 34-6 = 28 при стандартных значениях
+  var _shRobeH = bh+13;             // удлинённая ряса
+  var _shStaffTop = bodyBaseY-bh-28; // ~14
+  var _shStaffBot = baseY-6;         // ~80
+  var _shSkullY = _shStaffTop+4;     // на вершине посоха
 
-      else if(heroType==='shaman'){
+  /* Ноги (рисуем первыми — ряса их прикроет) */
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-6,bodyBaseY,5,legH);ctx.fillRect(cx+1,bodyBaseY,5,legH);
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.strokeRect(cx-6,bodyBaseY,5,legH);ctx.strokeRect(cx+1,bodyBaseY,5,legH);
+
+  /* Ряса */
   var sg=ctx.createLinearGradient(cx-12,0,cx+12,0);
   sg.addColorStop(0,'#1a0808');sg.addColorStop(0.5,'#5a1a1a');sg.addColorStop(1,'#1a0808');
   ctx.fillStyle=sg;
-  roundRect(ctx,cx-12,bodyBaseY-bh,24,bh+4,3);ctx.fill();
+  roundRect(ctx,cx-12,bodyBaseY-bh,24,_shRobeH,3);ctx.fill();
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1.4;ctx.stroke();
+  /* Неровный низ рясы */
   ctx.beginPath();
-  ctx.moveTo(cx-12,baseY-2);
+  ctx.moveTo(cx-12,bodyBaseY-bh+_shRobeH-2);
   for(var _svi=0;_svi<6;_svi++){
     var _svx=cx-12+_svi*4;
-    ctx.lineTo(_svx+2,baseY-8-(_svi%2)*4);ctx.lineTo(_svx+4,baseY-2);
+    ctx.lineTo(_svx+2,bodyBaseY-bh+_shRobeH+4-(_svi%2)*4);
+    ctx.lineTo(_svx+4,bodyBaseY-bh+_shRobeH-2);
   }
   ctx.closePath();ctx.fillStyle='#1a0808';ctx.fill();
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.stroke();
+
+  /* Костяные пластины спереди */
   if(!isBack){
     ctx.fillStyle='#e0d8c0';
     for(var _bi3=0;_bi3<5;_bi3++){
@@ -1912,20 +1928,30 @@ function drawInquisitorSide(ctx,W,H,team){
       ctx.strokeStyle='#3a2010';ctx.lineWidth=0.5;ctx.strokeRect(_bxi,bodyBaseY-bh+20,3,4);
     }
   }
+
+  /* Рука к посоху */
   ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(cx+10,bodyBaseY-bh+10);ctx.lineTo(cx+16,bodyBaseY-bh+16);ctx.stroke();
   ctx.lineCap='butt';
+
+  /* Посох — длинный, от вершины головы до земли */
   ctx.strokeStyle='#3a2010';ctx.lineWidth=2.6;
-  ctx.beginPath();ctx.moveTo(cx+16,bodyBaseY-bh+20);ctx.lineTo(cx+16,baseY-6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+16,_shStaffTop);ctx.lineTo(cx+16,_shStaffBot);ctx.stroke();
   ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(cx+16,bodyBaseY-bh+20);ctx.lineTo(cx+16,baseY-6);ctx.stroke();
-  ctx.fillStyle='#e8e0d0';ctx.beginPath();ctx.arc(cx+16,bodyBaseY-bh+14,5,0,TAU);ctx.fill();
+  ctx.beginPath();ctx.moveTo(cx+16,_shStaffTop);ctx.lineTo(cx+16,_shStaffBot);ctx.stroke();
+
+  /* Череп на вершине посоха */
+  ctx.fillStyle='#e8e0d0';ctx.beginPath();ctx.arc(cx+16,_shSkullY,5,0,TAU);ctx.fill();
   ctx.strokeStyle='#3a2010';ctx.lineWidth=1;ctx.stroke();
   ctx.fillStyle='#0a0000';
-  ctx.beginPath();ctx.arc(cx+14,bodyBaseY-bh+13,1.4,0,TAU);ctx.arc(cx+18,bodyBaseY-bh+13,1.4,0,TAU);ctx.fill();
+  ctx.beginPath();ctx.arc(cx+14,_shSkullY-1,1.4,0,TAU);ctx.arc(cx+18,_shSkullY-1,1.4,0,TAU);ctx.fill();
+
+  /* Рога-перья на черепе */
   ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(cx+12,bodyBaseY-bh+10);ctx.lineTo(cx+9,bodyBaseY-bh+6);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(cx+20,bodyBaseY-bh+10);ctx.lineTo(cx+23,bodyBaseY-bh+6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+12,_shSkullY-4);ctx.lineTo(cx+9,_shSkullY-8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+20,_shSkullY-4);ctx.lineTo(cx+23,_shSkullY-8);ctx.stroke();
+
+  /* Левая рука с кинжалом */
   ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(cx-9,bodyBaseY-bh+10);ctx.lineTo(cx-4,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+22);ctx.stroke();
   ctx.strokeStyle='#4a6a28';ctx.lineWidth=1.2;
@@ -1934,35 +1960,47 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.beginPath();ctx.arc(cx+12,bodyBaseY-bh+22,2.4,0,TAU);ctx.fill();
   ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
   ctx.lineCap='butt';
+
+  /* Шея */
   ctx.fillStyle=skinPal.skin;
-  ctx.fillRect(cx-3,headY+headR-3,6,8);
+  ctx.fillRect(cx-3,_shHeadY+headR-3,6,8);
   ctx.strokeStyle=skinPal.skinD;ctx.lineWidth=1;
-  ctx.strokeRect(cx-3,headY+headR-3,6,8);
+  ctx.strokeRect(cx-3,_shHeadY+headR-3,6,8);
+
+  /* Капюшон сзади */
   ctx.fillStyle='#1a0808';
   ctx.beginPath();
-  ctx.moveTo(cx-headR-3,headY+headR);
-  ctx.quadraticCurveTo(cx-headR-4,headY-headR-3,cx,headY-headR-6);
-  ctx.quadraticCurveTo(cx+headR+4,headY-headR-3,cx+headR+3,headY+headR);
+  ctx.moveTo(cx-headR-3,_shHeadY+headR);
+  ctx.quadraticCurveTo(cx-headR-4,_shHeadY-headR-3,cx,_shHeadY-headR-6);
+  ctx.quadraticCurveTo(cx+headR+4,_shHeadY-headR-3,cx+headR+3,_shHeadY+headR);
   ctx.closePath();ctx.fill();
   ctx.strokeStyle='#0a0404';ctx.lineWidth=1.2;ctx.stroke();
-  var hgS=ctx.createRadialGradient(cx-2,headY-2,1,cx,headY,headR);
+
+  /* Голова */
+  var hgS=ctx.createRadialGradient(cx-2,_shHeadY-2,1,cx,_shHeadY,headR);
   hgS.addColorStop(0,skinPal.skinL);hgS.addColorStop(0.7,skinPal.skin);hgS.addColorStop(1,skinPal.skinD);
-  ctx.fillStyle=hgS;ctx.beginPath();ctx.arc(cx,headY,headR,0,TAU);ctx.fill();
+  ctx.fillStyle=hgS;ctx.beginPath();ctx.arc(cx,_shHeadY,headR,0,TAU);ctx.fill();
   ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
+
+  /* Лицо — только спереди */
   if(!isBack){
+    /* Ритуальные шрамы */
     ctx.strokeStyle='#a04040';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(cx-5,headY-2);ctx.lineTo(cx-3,headY+3);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx+6,headY-4);ctx.lineTo(cx+4,headY+1);ctx.stroke();
-    var eg=ctx.createRadialGradient(cx-3,headY+1,0.3,cx-3,headY+1,3);
+    ctx.beginPath();ctx.moveTo(cx-5,_shHeadY-2);ctx.lineTo(cx-3,_shHeadY+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+6,_shHeadY-4);ctx.lineTo(cx+4,_shHeadY+1);ctx.stroke();
+    /* Светящиеся глаза */
+    var eg=ctx.createRadialGradient(cx-3,_shHeadY+1,0.3,cx-3,_shHeadY+1,3);
     eg.addColorStop(0,'#fff');eg.addColorStop(0.4,'#ff8020');eg.addColorStop(1,'rgba(180,40,0,0)');
-    ctx.fillStyle=eg;ctx.beginPath();ctx.arc(cx-3,headY+1,3,0,TAU);ctx.fill();
-    var eg2=ctx.createRadialGradient(cx+3,headY+1,0.3,cx+3,headY+1,3);
+    ctx.fillStyle=eg;ctx.beginPath();ctx.arc(cx-3,_shHeadY+1,3,0,TAU);ctx.fill();
+    var eg2=ctx.createRadialGradient(cx+3,_shHeadY+1,0.3,cx+3,_shHeadY+1,3);
     eg2.addColorStop(0,'#fff');eg2.addColorStop(0.4,'#ff8020');eg2.addColorStop(1,'rgba(180,40,0,0)');
-    ctx.fillStyle=eg2;ctx.beginPath();ctx.arc(cx+3,headY+1,3,0,TAU);ctx.fill();
+    ctx.fillStyle=eg2;ctx.beginPath();ctx.arc(cx+3,_shHeadY+1,3,0,TAU);ctx.fill();
+    /* Клыки */
     ctx.fillStyle='#f0e8d0';
-    ctx.beginPath();ctx.moveTo(cx-3,headY+6);ctx.lineTo(cx-2.5,headY+9);ctx.lineTo(cx-1.5,headY+6);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(cx+3,headY+6);ctx.lineTo(cx+2.5,headY+9);ctx.lineTo(cx+1.5,headY+6);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx-3,_shHeadY+6);ctx.lineTo(cx-2.5,_shHeadY+9);ctx.lineTo(cx-1.5,_shHeadY+6);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx+3,_shHeadY+6);ctx.lineTo(cx+2.5,_shHeadY+9);ctx.lineTo(cx+1.5,_shHeadY+6);ctx.closePath();ctx.fill();
   }
+}}
 }
 else if(heroType==='hunter'){
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-6,bodyBaseY,5,legH);ctx.fillRect(cx+1,bodyBaseY,5,legH);
@@ -7345,6 +7383,23 @@ Game.prototype.ejectFromBuildings=function(u){
       u._path=null;u._pathIdx=0;
     }
   }
+  /* ПАТЧ 5.1: выталкивание из деревьев/шахт */
+  for(var _ri=0;_ri<this.resources.length;_ri++){
+    var _r=this.resources[_ri];
+    if(_r.dead||_r.falling) continue;
+    if(_r===u.gatherTarget) continue;   // не выпихиваем рабочего с его же дерева/шахты
+    var _dxr=u.x-_r.x,_dyr=u.y-_r.y;
+    var _rrad = (_r.kind==='gold') ? _r.radius*0.55 : 34;
+    var _minDr = u.radius + _rrad;
+    var _d2r = _dxr*_dxr + _dyr*_dyr;
+    if(_d2r < _minDr*_minDr){
+      var _dr=Math.sqrt(_d2r);
+      if(_dr<0.01){_dxr=1;_dyr=0;_dr=1;}
+      u.x = this.clampX(_r.x + _dxr/_dr*(_minDr+1));
+      u.y = this.clampY(_r.y + _dyr/_dr*(_minDr+1));
+      u._path=null;u._pathIdx=0;
+    }
+  }
 };
 Game.prototype._smartMove=function(u,dx,dy,spd){
   var d=Math.hypot(dx,dy);if(d<0.01) return false;
@@ -8374,9 +8429,14 @@ Game.prototype.performAttack=function(a,t){
   t.hp-=dmg;t.hitFlash=0.2;t.lastAttacker=a;
   if(t.isBuilding) Audio.sfx('building_hit',t.x,t.y);
   if(t.isUnit||t.isCreep){
-    var ang=Math.atan2(t.y-a.y,t.x-a.x),kb=a.isHero?9:5;
-    t.x+=Math.cos(ang)*kb;t.y+=Math.sin(ang)*kb;
+  var ang=Math.atan2(t.y-a.y,t.x-a.x),kb=a.isHero?9:5;
+  var _ntx=t.x+Math.cos(ang)*kb, _nty=t.y+Math.sin(ang)*kb;
+  var _tr = t.radius||11;
+  /* ПАТЧ 5.2: не зашвыриваем цель внутрь дерева/здания */
+  if(!this._wouldHitResource(_ntx,_nty,_tr,null) && !this._wouldHitBuilding(_ntx,_nty,_tr,null,false,-1)){
+    t.x=_ntx; t.y=_nty;
   }
+}
   if(a.race==='luminite'){
     for(var lp=0;lp<5;lp++){var la=Math.random()*TAU,ls=50+Math.random()*80;this.particles.spawn(t.x,t.y-10,Math.cos(la)*ls,Math.sin(la)*ls-20,0.5,'#ffe9a8',3);}
     this.particles.spawn(t.x-8,t.y-10,-30,-50,0.4,'#fff8d0',2.5);
@@ -9670,24 +9730,33 @@ Game.prototype.handleLeftClick=function(sx,sy,add){
   }
 
   
-  if((pick.unit&&pick.unit.pid!==this.playerPid&&pick.unit.team!==this.playerTeam)||(pick.building&&pick.building.pid!==this.playerPid&&pick.building.team!==this.playerTeam)){
-    
-    if(hasOwnSel){
-      var target=pick.unit||pick.building;
-      var sel=[];
-      for(i=0;i<this.units.length;i++){var su=this.units[i];if(su.sel&&su.pid===this.playerPid&&!su.dying) sel.push(su);}
-      for(var wi=0;wi<sel.length;wi++){
-        var u2=sel[wi];
-        u2.stationed=false;
-        u2._speedLimit=null;u2._armyTag=null;
-        if(u2.role==='worker'){u2.moveTo={x:target.x,y:target.y};u2._path=null;u2._pathIdx=0;continue;}
-        u2.target=target;u2.lockedTarget=target;u2.moveTo=null;u2.gatherTarget=null;
-        u2.stance='aggressive';u2.patrolRoute=null;u2._retreating=false;
-        u2.attackMoveTo={x:target.x,y:target.y};
-      }
-      Audio.sfx('notify');
-      return;
+  var _foreignTarget = pick.unit || pick.building;
+if(_foreignTarget && _foreignTarget.pid!==this.playerPid){
+  var _isEnemy = _foreignTarget.team!==this.playerTeam;
+  var _canAttack = _isEnemy && hasOwnSel && !_foreignTarget.dying && !_foreignTarget.dead;
+  if(_canAttack){
+    var sel=[];
+    for(i=0;i<this.units.length;i++){var su=this.units[i];if(su.sel&&su.pid===this.playerPid&&!su.dying) sel.push(su);}
+    for(var wi=0;wi<sel.length;wi++){
+      var u2=sel[wi];
+      u2.stationed=false;
+      u2._speedLimit=null;u2._armyTag=null;
+      if(u2.role==='worker'){u2.moveTo={x:_foreignTarget.x,y:_foreignTarget.y};u2._path=null;u2._pathIdx=0;continue;}
+      u2.target=_foreignTarget;u2.lockedTarget=_foreignTarget;u2.moveTo=null;u2.gatherTarget=null;
+      u2.stance='aggressive';u2.patrolRoute=null;u2._retreating=false;
+      u2.attackMoveTo={x:_foreignTarget.x,y:_foreignTarget.y};
     }
+    Audio.sfx('notify');
+    return;
+  }
+  // инспект (союзник, или враг без своего выделения)
+  for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
+  for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
+  this.selResource=null;
+  if(pick.unit){this.inspectUnit=pick.unit;this.inspectBuilding=null;UI.showInspectInfo(pick.unit);}
+  else{this.inspectBuilding=pick.building;this.inspectUnit=null;UI.showInspectInfo(pick.building);}
+  return;
+}
     for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
     for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
     this.selResource=null;
@@ -10237,15 +10306,19 @@ Renderer.prototype.s2w=function(sx,sy){var c=this.g.camera;return{x:(sx-this.w/2
 Renderer.prototype._legs=function(u,p,s){
   var def=getLeg(u.role);if(!def) return;
   var ctx=this.ctx,z=this.g.camera.zoom;
+  if(u.role==='cav'||u.role==='siege'||u.role==='fly') return;
   var legW=def.w*s,legH=def.h*s,spread=def.spread*s;
-  var cx=p.x,baseY=p.y+2*z,bodyBaseY=baseY-legH;
+  /* ПАТЧ 3.2: выравниваем ноги по фактическому дну спрайта.
+     Спрайт рисуется с drawY = p.y - H*s*0.94, значит его дно (в спрайте H) = p.y + H*s*0.06.
+     Для вариантных героев H=90, для обычных — 74 (см. bakeUnit). */
+  var spriteH = u.isHero ? 90 : 74;
+  var spriteBottomY = p.y + spriteH*s*0.06;
+  var bodyBaseY = spriteBottomY - legH;
   var phase=(u.walkPhase||0)+u.walkOffset;
   var moving=u.moving&&!u.dying;
   var swing=moving?Math.sin(phase*1.6):0;
-  if(u.role==='cav'||u.role==='siege'||u.role==='fly') return;
-  var legAX=cx-spread,legBX=cx+spread,backIsA=swing<=0;
+  var legAX=p.x-spread,legBX=p.x+spread,backIsA=swing<=0;
   var backX=backIsA?legAX:legBX,frontX=backIsA?legBX:legAX;
-  // ПАТЧ H: скорость фазы ×2.2 + подъём стопы
   this._oneLeg(ctx,backX,bodyBaseY,phase*2.2+Math.PI,true,legW,legH,moving);
   this._oneLeg(ctx,frontX,bodyBaseY,phase*2.2,false,legW,legH,moving);
 };
@@ -10255,7 +10328,7 @@ Renderer.prototype._oneLeg=function(ctx,lx,by,ph,back,lw,lh,moving){
   var lift =moving?Math.max(0,Math.sin(ph))*3.5:0;
   ctx.save();
   ctx.translate(lx,by);
-  ctx.rotate(swing*0.10);
+  ctx.rotate(swing*0.18);
   ctx.fillStyle=back?'#2a1a0a':'#3a2010';
   ctx.fillRect(-lw/2,0,lw,lh*0.5);
   ctx.strokeStyle='#000';ctx.lineWidth=0.6;ctx.strokeRect(-lw/2,0,lw,lh*0.5);
@@ -14976,7 +15049,15 @@ else if(sel.length){
       }
       var wdef=RACES[b2.race].units.worker;
       var wprice=self.costStr(wdef.gold,wdef.wood)+self.foodStr('worker');
-      var wtip=uName(b2.race,'worker')+'\nHP '+wdef.hp+' · Урон '+wdef.dmg+' · Дальность '+wdef.range+' · Скорость '+wdef.spd+'\nЗолото: '+wdef.gold+' · Еда: '+(FOOD_COST.worker||1)+'\nВремя: '+wdef.time+'с\n'+t_('u_worker_desc');
+      var wtip=uName(b2.race,'worker')
+  +'\nHP: '+wdef.hp
+  +'\nУрон: '+wdef.dmg
+  +'\nДальность: '+wdef.range
+  +'\nСкорость: '+wdef.spd
+  +'\nЗолото: '+wdef.gold
+  +'\nЕда: '+(FOOD_COST.worker||1)
+  +'\nВремя: '+wdef.time+'с'
+  +'\n'+t_('u_worker_desc');
       var trainBlocked=!!b2.upgrading;
       this.addAction(box,unitIconImg(b2.race,'worker'),uName(b2.race,'worker'),wprice,function(){self.queueUnit(b2,'worker');},false,trainBlocked,trainBlocked?'Идёт улучшение ратуши':wtip);
     } else if(b2.completed){
@@ -14995,7 +15076,16 @@ else if(sel.length){
             (function(rr){
               var def=RACES[b2.race].units[rr];if(!def) return;
               var priceU=self.costStr(def.gold,def.wood)+self.foodStr(rr);
-              var tipU=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              var tipU=uName(b2.race,rr)
+  +'\nHP: '+def.hp
+  +'\nУрон: '+def.dmg
+  +'\nДальность: '+def.range
+  +'\nСкорость: '+def.spd
+  +'\nЗолото: '+def.gold
+  +'\nДерево: '+def.wood
+  +'\nЕда: '+(FOOD_COST[rr]||1)
+  +'\nВремя: '+def.time+'с'
+  +'\n'+t_('u_'+rr+'_desc');
               if(busyForge) tipU='Кузница занята улучшением — найм недоступен\n\n'+tipU;
               self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU,function(){self.queueUnit(b2,rr);},false,!!busyForge,tipU);
             })(roles[i]);
@@ -15071,11 +15161,22 @@ else if(sel.length){
                 var _canR2=(_res2.gold>=_heroDef.gold)&&(_res2.wood>=_heroDef.wood);
                 var _timeR=25+2*(_deadH2.level||1);
                 var _priceR=self.costStr(_heroDef.gold,_heroDef.wood)+self.foodStr('hero');
-                var _tipR=t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level+'\nЗолото: '+_heroDef.gold+' · Дерево: '+_heroDef.wood+'\nВремя: '+_timeR+'с\nСпособности и очки сохранятся.';
+                var _tipR=t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level
+  +'\nЗолото: '+_heroDef.gold
+  +'\nДерево: '+_heroDef.wood
+  +'\nВремя: '+_timeR+'с'
+  +'\nСпособности и очки сохранятся.';
                 self.addAction(box,unitIconImg(b2.race,'hero',_HT),t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level,_priceR,function(){self.resurrectHero(b2,_HT);},false,!_canR2,_tipR);
               } else {
                 var _priceH=self.costStr(_heroDef.gold,_heroDef.wood)+self.foodStr('hero');
-                var _tipH=_displayName+'\nHP '+_heroDef.hp+' · Урон '+_heroDef.dmg+' · Дальность '+_heroDef.range+' · Скорость '+_heroDef.spd+'\nЗолото: '+_heroDef.gold+' · Дерево: '+_heroDef.wood+'\nВремя: '+_heroDef.time+'с';
+                var _tipH=_displayName
+  +'\nHP: '+_heroDef.hp
+  +'\nУрон: '+_heroDef.dmg
+  +'\nДальность: '+_heroDef.range
+  +'\nСкорость: '+_heroDef.spd
+  +'\nЗолото: '+_heroDef.gold
+  +'\nДерево: '+_heroDef.wood
+  +'\nВремя: '+_heroDef.time+'с';
                 self.addAction(box,unitIconImg(b2.race,'hero',_HT),_displayName,_priceH,function(){self.queueUnit(b2,'hero',_HT);},false,false,_tipH);
               }
             })(_hts[_hti]);
@@ -15085,7 +15186,16 @@ else if(sel.length){
             (function(rr){
               var def=RACES[b2.race].units[rr];if(!def) return;
               var priceU2=self.costStr(def.gold,def.wood)+self.foodStr(rr);
-              var tipU2=uName(b2.race,rr)+'\nHP '+def.hp+' · Урон '+def.dmg+' · Дальность '+def.range+' · Скорость '+def.spd+'\nЗолото: '+def.gold+' · Дерево: '+def.wood+' · Еда: '+(FOOD_COST[rr]||1)+'\nВремя: '+def.time+'с\n'+t_('u_'+rr+'_desc');
+              var tipU2=uName(b2.race,rr)
+  +'\nHP: '+def.hp
+  +'\nУрон: '+def.dmg
+  +'\nДальность: '+def.range
+  +'\nСкорость: '+def.spd
+  +'\nЗолото: '+def.gold
+  +'\nДерево: '+def.wood
+  +'\nЕда: '+(FOOD_COST[rr]||1)
+  +'\nВремя: '+def.time+'с'
+  +'\n'+t_('u_'+rr+'_desc');
               self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU2,function(){self.queueUnit(b2,rr);},false,false,tipU2);
             })(roles[i]);
           }
@@ -15404,6 +15514,8 @@ UISys.prototype.drawMinimap=function(){
   if(!tip||!Game_||!Renderer_) return;
   var show=this._mobileTip;
   if(!show){tip.classList.remove('show');return;}
+  /* ПАТЧ 6.1: helper для иконок в тултипе */
+  var _mkW = function(k){return ' <img src="'+toolIconURL(k,12)+'" style="width:12px;height:12px;vertical-align:-2px;display:inline-block">';};
   var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
   var ent=pick.unit||pick.creep||pick.building||pick.resource;
   if(!ent){tip.classList.remove('show');return;}
@@ -15413,12 +15525,12 @@ UISys.prototype.drawMinimap=function(){
     var u=pick.unit;
     var name=u.isHero?('⭐ '+((t_('hero_'+(u.heroType||'paladin'))!==('hero_'+(u.heroType||'paladin')))?t_('hero_'+(u.heroType||'paladin')):uName(u.race,'hero'))):uName(u.race,u.role);
     tt='<div class="tt-name">'+name+(u.isHero?' Ур.'+u.level:'')+' ('+t_('team')+(u.team+1)+')</div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(u.hp)+'/'+u.maxHp+'</span></div>';
-    if(u.isHero||u.isHealer) tt+='<div class="tt-row"><span>'+t_('mana')+'</span><span>'+Math.floor(u.mana||0)+'/'+(u.maxMana||100)+'</span></div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+u.dmg+'</span></div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+u.range+'</span></div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_spd')+'</span><span>'+u.spd+'</span></div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>'+(FOOD_COST[u.role]||1)+'</span></div>';
+        tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(u.hp)+'/'+u.maxHp+_mkW('hp')+'</span></div>';
+    if(u.isHero||u.isHealer) tt+='<div class="tt-row"><span>'+t_('mana')+'</span><span>'+Math.floor(u.mana||0)+'/'+(u.maxMana||100)+_mkW('mana')+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+u.dmg+_mkW('weapon_melee')+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+u.range+_mkW('range')+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_spd')+'</span><span>'+u.spd+_mkW('speed')+'</span></div>';
+    tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>'+(FOOD_COST[u.role]||1)+_mkW('meat')+'</span></div>';
     if(u.owner==='bot') tt+='<div class="tt-row"><span>Владелец</span><span>'+t_('bot')+'</span></div>';
     var _effList=[];
     if(u.invulT>0) _effList.push('Неуязвимость '+u.invulT.toFixed(1)+'с');
@@ -15447,20 +15559,20 @@ UISys.prototype.drawMinimap=function(){
     var cc=pick.creep;
     var creepName=getCreepName(cc.kind);
     tt='<div class="tt-name">'+creepName+' Lv.'+cc.level+(cc.isBoss?' BOSS':'')+'</div>';
-    tt+='<div class="tt-row"><span>HP</span><span>'+Math.ceil(cc.hp)+'/'+cc.maxHp+'</span></div>';
-    tt+='<div class="tt-row"><span>Урон</span><span>'+cc.dmg+'</span></div>';
-    tt+='<div class="tt-row"><span>Броня</span><span>'+cc.armor.toFixed(2)+'</span></div>';
-    tt+='<div class="tt-row"><span>Награда</span><span>'+cc.goldReward+'</span></div>';
+        tt+='<div class="tt-row"><span>HP</span><span>'+Math.ceil(cc.hp)+'/'+cc.maxHp+_mkW('hp')+'</span></div>';
+    tt+='<div class="tt-row"><span>Урон</span><span>'+cc.dmg+_mkW('weapon_melee')+'</span></div>';
+    tt+='<div class="tt-row"><span>Броня</span><span>'+cc.armor.toFixed(2)+_mkW('shield')+'</span></div>';
+    tt+='<div class="tt-row"><span>Награда</span><span>'+cc.goldReward+_mkW('gold')+'</span></div>';
   } else if(pick.building){
     var b=pick.building;
     var towerUpTag='';
     if(b.kind==='tower'&&b.towerUpgrade) towerUpTag=' ('+towerUpgradeName(b.towerUpgrade)+')';
     tt='<div class="tt-name">'+bldName(b.race,b.kind)+towerUpTag+(b.completed?' Ур.'+b.level:' '+Math.floor((b.buildProgress/b.buildTime)*100)+'%')+'</div>';
-    tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(b.hp)+'/'+b.maxHp+'</span></div>';
-    if(b.atk) tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+b.atk+'</span></div>';
-    if(b.rng) tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+b.rng+'</span></div>';
-    if(b.kind==='house') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+8</span></div>';
-    if(b.kind==='townhall') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+16</span></div>';
+        tt+='<div class="tt-row"><span>'+t_('tt_hp')+'</span><span>'+Math.ceil(b.hp)+'/'+b.maxHp+_mkW('hp')+'</span></div>';
+    if(b.atk) tt+='<div class="tt-row"><span>'+t_('tt_dmg')+'</span><span>'+b.atk+_mkW('weapon_melee')+'</span></div>';
+    if(b.rng) tt+='<div class="tt-row"><span>'+t_('tt_range')+'</span><span>'+b.rng+_mkW('range')+'</span></div>';
+    if(b.kind==='house') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+8'+_mkW('meat')+'</span></div>';
+    if(b.kind==='townhall') tt+='<div class="tt-row"><span>'+t_('tt_food')+'</span><span>+16'+_mkW('meat')+'</span></div>';
     if(b.kind==='lumber'&&(b.sawmillLevel||0)>0) tt+='<div class="tt-row"><span>Уровень</span><span>'+b.sawmillLevel+'</span></div>';
     if(b.techUpgrading) tt+='<div class="tt-row"><span>Прокачка</span><span>'+uName(b.race,b.techUpgrading.role)+'</span></div>';
     var descKey='d_'+b.kind;
