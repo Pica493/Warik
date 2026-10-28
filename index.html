@@ -2000,7 +2000,7 @@ else if(heroType==='shaman'){
     ctx.beginPath();ctx.moveTo(cx-3,_shHeadY+6);ctx.lineTo(cx-2.5,_shHeadY+9);ctx.lineTo(cx-1.5,_shHeadY+6);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(cx+3,_shHeadY+6);ctx.lineTo(cx+2.5,_shHeadY+9);ctx.lineTo(cx+1.5,_shHeadY+6);ctx.closePath();ctx.fill();
   }
-}}
+}
 }
 else if(heroType==='hunter'){
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-6,bodyBaseY,5,legH);ctx.fillRect(cx+1,bodyBaseY,5,legH);
@@ -9749,7 +9749,7 @@ if(_foreignTarget && _foreignTarget.pid!==this.playerPid){
     Audio.sfx('notify');
     return;
   }
-  // инспект (союзник, или враг без своего выделения)
+    // инспект (союзник, или враг без своего выделения)
   for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
   for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
   this.selResource=null;
@@ -9757,13 +9757,6 @@ if(_foreignTarget && _foreignTarget.pid!==this.playerPid){
   else{this.inspectBuilding=pick.building;this.inspectUnit=null;UI.showInspectInfo(pick.building);}
   return;
 }
-    for(i=0;i<this.units.length;i++) if(this.units[i].pid===this.playerPid) this.units[i].sel=false;
-    for(i=0;i<this.buildings.length;i++) if(this.buildings[i].pid===this.playerPid) this.buildings[i].sel=false;
-    this.selResource=null;
-    if(pick.unit){this.inspectUnit=pick.unit;this.inspectBuilding=null;UI.showInspectInfo(pick.unit);}
-    else{this.inspectBuilding=pick.building;this.inspectUnit=null;UI.showInspectInfo(pick.building);}
-    return;
-  }
   if(pick.creep){
     if(hasOwnSel){
       var selC=[];
