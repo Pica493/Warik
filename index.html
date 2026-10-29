@@ -7417,15 +7417,13 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
         this.particles.spawn(u.x+Math.cos(_tpa)*_tpr,u.y+Math.sin(_tpa)*_tpr,-Math.cos(_tpa)*30,-Math.sin(_tpa)*30-20,1.0,'#80ff60',2.5);
       }
     }
-    u.moving=false;
-    return;
-  }
-    }
-    u.moving=false;
-    if(u.hp<=0){u.dying=true;u.deathT=0;u.deathDir=1;}
-    if(u.dying){u.deathT+=dt;if(u.deathT>1.6)u.dead=true;}
-    return;
-  }
+                u.moving=false;
+            return;
+          }
+          
+          u.moving=false;
+          if(u.hp<=0){u.dying=true;u.deathT=0;u.deathDir=1;}
+          if(u.dying){u.deathT+=dt;if(u.deathT>1.6)u.dead=true;return;}
   if(u._insideMine && (!u.gatherTarget || u.gatherTarget.dead || u.gatherTarget.amount<=0 || u.gatherTarget.falling)){
     u._insideMine=false;u._mineSlot=-1;u._waitingForMine=false;
     if(u.role==='worker'){
