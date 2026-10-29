@@ -12417,7 +12417,6 @@ AIController.prototype.pickFocusTarget=function(cx,cy,radius){
   }
   return best;
 };
-};
 AIController.prototype.getEnemyComposition=function(){
   var g=this.g;var c={cav:0,fly:0,ranged:0,spear:0,melee:0,elite:0,siege:0};
   for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.team===this.team||u.dying) continue;if(c[u.role]!==undefined) c[u.role]++;}
