@@ -10940,7 +10940,7 @@ AIController.prototype.tryBuild=function(){
   if(this._underHeavyAttack || this.underAttack){
     if((builtCount.tower||0) < 4 && res.gold >= this.race.buildings.tower.gold && res.wood >= this.race.buildings.tower.wood){
       var _twDef = this.race.buildings.tower;
-            var _twW = null;
+      var _twW = null;
       // 1. Сначала ищем просто свободного рабочего
       for(var _twI=0;_twI<g.units.length;_twI++){ 
         var _twU=g.units[_twI]; 
@@ -10954,8 +10954,10 @@ AIController.prototype.tryBuild=function(){
           var _twU=g.units[_twI]; 
           if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying){ 
             _twW=_twU; 
-            _twW.gatherTarget=null; // Очищаем задачу
+            _twW.gatherTarget=null; 
             _twW._assignedMine=null;
+            _twW.carrying=null; _twW.carryAmt=0; // ВОТ ЭТОГО НЕ ХВАТАЛО
+            _twW.moveTo=null; _twW._path=null;   // ВОТ ЭТОГО НЕ ХВАТАЛО
             break; 
           } 
         }
@@ -11045,7 +11047,7 @@ for(var oi=0;oi<order.length;oi++){
   if(!nextKind) return;
   var def=this.race.buildings[nextKind];if(!def) return;
   if(res.gold<def.gold||res.wood<def.wood) return;
-    var w=null;
+      var w=null;
   // 1. Ищем свободного
   for(var k2=0;k2<g.units.length;k2++){
     var u=g.units[k2];
@@ -11057,8 +11059,10 @@ for(var oi=0;oi<order.length;oi++){
       var u=g.units[k2];
       if(u.pid===this.pid && u.role==='worker' && !u.dying){
         w=u;
-        w.gatherTarget=null;
+        w.gatherTarget=null; 
         w._assignedMine=null;
+        w.carrying=null; w.carryAmt=0; // Выбрасываем ресурсы
+        w.moveTo=null; w._path=null;   // Сбрасываем маршрут
         break;
       }
     }
@@ -12214,7 +12218,7 @@ AIController.prototype.healAlliesOutOfCombat=function(){
     if(_chkB.dead||_chkB.pid!==this.pid||_chkB.kind!=='townhall') continue;
     if(Math.hypot(_chkB.x-tx,_chkB.y-ty)<700) return;
   }
-    var w=null;
+      var w=null;
   // 1. Ищем свободного
   for(var k=0;k<g.units.length;k++){
     var u=g.units[k];
@@ -12226,18 +12230,15 @@ AIController.prototype.healAlliesOutOfCombat=function(){
       var u=g.units[k];
       if(u.pid===this.pid && u.role==='worker' && !u.dying){
         w=u;
-        w.gatherTarget=null;
-        w._assignedMine=null;
+        w.gatherTarget=null; w._assignedMine=null;
+        w.carrying=null; w.carryAmt=0; // Выбрасываем ресурсы
+        w.moveTo=null; w._path=null;   // Сбрасываем старый маршрут
         break;
       }
     }
   }
   if(!w) return;
   for(var ob=0;ob<g.buildings.length;ob++){var bb=g.buildings[ob];var dx=bb.x-tx,dy=bb.y-ty,rr=bb.radius+180;if(dx*dx+dy*dy<rr*rr) return;}
-  for(var obr=0;obr<g.resources.length;obr++){var r3=g.resources[obr];if(r3.dead) continue;var dx3=r3.x-tx,dy3=r3.y-ty,rr3=r3.radius+90;if(dx3*dx3+dy3*dy3<rr3*rr3) return;}
-  g.subRes(this.pid,thDef.gold,thDef.wood);
-  var nb=new Building(tx,ty,this.team,thDef,this.raceId);
-  nb.completed=false;nb.buildProgress=0;nb.owner='bot';nb.aiId=this.aiId;nb.pid=this.pid;
   g.buildings.push(nb);g.navDirty=true;
   w.buildTarget=nb;w.gatherTarget=null;w.moveTo=null;w._insideMine=false;w._mineSlot=-1;w._waitingForMine=false;w._path=null;w._pathIdx=0;
   var _nearGold=null,_ngD=Infinity;
