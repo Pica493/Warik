@@ -10841,9 +10841,13 @@ AIController.prototype.assignWorkers=function(){
     if(u.carrying&&u.carryAmt>=10) continue;
     freeW.push(u);
   }
-  if(!freeW.length) return;
+    if(!freeW.length) return;
   var needGold=Math.max(0,split.gold-curGold);
   var needWood=Math.max(0,split.wood-curWood);
+  
+  // Если на золоте и дереве уже достаточно рабочих (лимит достигнут),
+  // оставляем свободных рабочих в покое. Они будут ждать приказа на стройку.
+  if(needGold === 0 && needWood === 0) return;
 
   function _findRes(wk,wantKind,maxDist){
     var best=null,bs=-1e9;
@@ -10936,8 +10940,26 @@ AIController.prototype.tryBuild=function(){
   if(this._underHeavyAttack || this.underAttack){
     if((builtCount.tower||0) < 4 && res.gold >= this.race.buildings.tower.gold && res.wood >= this.race.buildings.tower.wood){
       var _twDef = this.race.buildings.tower;
-      var _twW = null;
-      for(var _twI=0;_twI<g.units.length;_twI++){ var _twU=g.units[_twI]; if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying && !_twU.buildTarget && !_twU.repairTarget){ _twW=_twU; break; } }
+            var _twW = null;
+      // 1. Сначала ищем просто свободного рабочего
+      for(var _twI=0;_twI<g.units.length;_twI++){ 
+        var _twU=g.units[_twI]; 
+        if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying && !_twU.buildTarget && !_twU.repairTarget){ 
+          _twW=_twU; break; 
+        } 
+      }
+      // 2. Если свободных нет — СИЛОЙ снимаем любого рабочего с добычи
+      if(!_twW){
+        for(var _twI=0;_twI<g.units.length;_twI++){ 
+          var _twU=g.units[_twI]; 
+          if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying){ 
+            _twW=_twU; 
+            _twW.gatherTarget=null; // Очищаем задачу
+            _twW._assignedMine=null;
+            break; 
+          } 
+        }
+      }
       if(_twW && th){
         // Ищем врага, который атакует, чтобы поставить башню в его сторону
         var _threat = null;
@@ -11023,8 +11045,24 @@ for(var oi=0;oi<order.length;oi++){
   if(!nextKind) return;
   var def=this.race.buildings[nextKind];if(!def) return;
   if(res.gold<def.gold||res.wood<def.wood) return;
-  var w=null;
-  for(var k2=0;k2<g.units.length;k2++){var u=g.units[k2];if(u.pid===this.pid&&u.role==='worker'&&!u.buildTarget&&!u.repairTarget&&!u.dying){w=u;break;}}
+    var w=null;
+  // 1. Ищем свободного
+  for(var k2=0;k2<g.units.length;k2++){
+    var u=g.units[k2];
+    if(u.pid===this.pid&&u.role==='worker'&&!u.buildTarget&&!u.repairTarget&&!u.dying){w=u;break;}
+  }
+  // 2. Если нет — забираем с добычи (строительство важнее)
+  if(!w){
+    for(var k2=0;k2<g.units.length;k2++){
+      var u=g.units[k2];
+      if(u.pid===this.pid && u.role==='worker' && !u.dying){
+        w=u;
+        w.gatherTarget=null;
+        w._assignedMine=null;
+        break;
+      }
+    }
+  }
   if(!w) return;
   for(var a=0;a<24;a++){
     var _nearestMine=null,_nmD=Infinity;
@@ -12176,8 +12214,24 @@ AIController.prototype.healAlliesOutOfCombat=function(){
     if(_chkB.dead||_chkB.pid!==this.pid||_chkB.kind!=='townhall') continue;
     if(Math.hypot(_chkB.x-tx,_chkB.y-ty)<700) return;
   }
-  var w=null;
-  for(var k=0;k<g.units.length;k++){var u=g.units[k];if(u.pid===this.pid&&u.role==='worker'&&!u.dying&&!u.buildTarget&&!u.repairTarget){w=u;break;}}
+    var w=null;
+  // 1. Ищем свободного
+  for(var k=0;k<g.units.length;k++){
+    var u=g.units[k];
+    if(u.pid===this.pid&&u.role==='worker'&&!u.dying&&!u.buildTarget&&!u.repairTarget){w=u;break;}
+  }
+  // 2. Если нет — забираем с добычи (вторая база — критически важна)
+  if(!w){
+    for(var k=0;k<g.units.length;k++){
+      var u=g.units[k];
+      if(u.pid===this.pid && u.role==='worker' && !u.dying){
+        w=u;
+        w.gatherTarget=null;
+        w._assignedMine=null;
+        break;
+      }
+    }
+  }
   if(!w) return;
   for(var ob=0;ob<g.buildings.length;ob++){var bb=g.buildings[ob];var dx=bb.x-tx,dy=bb.y-ty,rr=bb.radius+180;if(dx*dx+dy*dy<rr*rr) return;}
   for(var obr=0;obr<g.resources.length;obr++){var r3=g.resources[obr];if(r3.dead) continue;var dx3=r3.x-tx,dy3=r3.y-ty,rr3=r3.radius+90;if(dx3*dx3+dy3*dy3<rr3*rr3) return;}
