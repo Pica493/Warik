@@ -7356,7 +7356,7 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
   if(!blockedB&&!blockedR){
     u.x=this.clampX(nx);u.y=this.clampY(ny);return true;
   }
-  var slideTarget=blockedB||blockedR;
+    var slideTarget=blockedB||blockedR;
   if(slideTarget){
     var bb=slideTarget;
     var bdx=u.x-bb.x,bdy=u.y-bb.y,bd=Math.hypot(bdx,bdy);
@@ -7364,13 +7364,20 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
     if(bd<minD+6){
       var tan=Math.atan2(bdy,bdx)+Math.PI/2;
       var s1=(u.id%2)?1:-1;
-      var tx=u.x+Math.cos(tan)*s1*spd, ty=u.y+Math.sin(tan)*s1*spd;
-      if(!_bh(tx,ty,null)&&!this._wouldHitResource(tx,ty,u.radius,u.gatherTarget)){
-        u.x=this.clampX(tx);u.y=this.clampY(ty);return true;
+      var _angles=[0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6];
+      for(var _ai=0;_ai<_angles.length;_ai++){
+        var _tan=tan+_angles[_ai];
+        var tx=u.x+Math.cos(_tan)*s1*spd, ty=u.y+Math.sin(_tan)*s1*spd;
+        if(!_bh(tx,ty,null)&&!this._wouldHitResource(tx,ty,u.radius,u.gatherTarget)){
+          u.x=this.clampX(tx);u.y=this.clampY(ty);return true;
+        }
       }
-      var tx2=u.x+Math.cos(tan)*-s1*spd, ty2=u.y+Math.sin(tan)*-s1*spd;
-      if(!_bh(tx2,ty2,null)&&!this._wouldHitResource(tx2,ty2,u.radius,u.gatherTarget)){
-        u.x=this.clampX(tx2);u.y=this.clampY(ty2);return true;
+      for(var _ai2=0;_ai2<_angles.length;_ai2++){
+        var _tan2=tan+_angles[_ai2];
+        var tx2=u.x+Math.cos(_tan2)*-s1*spd, ty2=u.y+Math.sin(_tan2)*-s1*spd;
+        if(!_bh(tx2,ty2,null)&&!this._wouldHitResource(tx2,ty2,u.radius,u.gatherTarget)){
+          u.x=this.clampX(tx2);u.y=this.clampY(ty2);return true;
+        }
       }
     }
   }
@@ -7571,7 +7578,7 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
   if(!u.target && u.lockedTarget && !u.lockedTarget.dead && u.lockedTarget.hp>0 && u.stance!=='hold'){
     u.target=u.lockedTarget;
   }
-  if(u.stance!=='hold'&&!u.target && !u.attackMoveTo && !u.patrolRoute && !u._retreating){
+    if(u.stance!=='hold'&&!u.stationed&&!u.target && !u.attackMoveTo && !u.patrolRoute && !u._retreating){
     if(u.lastAttacker && !u.lastAttacker.dead && !u.lastAttacker.dying){
       var _laDist=Math.hypot(u.lastAttacker.x-u.x,u.lastAttacker.y-u.y);
       if(!u.stationed || _laDist < u.range+(u.lastAttacker.radius||20)+30){
@@ -7587,7 +7594,7 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
       if(e2){ this._markAutoAcquire(u); u.target=e2; }
     }
   }
-  if(u.stance!=='hold'&&!u.target&&!u._retreating){
+    if(u.stance!=='hold'&&!u.stationed&&!u.target&&!u._retreating){
     var isIdleWorker=u.role==='worker'&&!u.gatherTarget&&!u.buildTarget&&!u.repairTarget&&!u.moveTo&&!u.carrying&&!hasOrder&&!u.demolishTarget&&!u._waitingForMine&&!u._insideMine&&!u.stationed;
     var isIdleCombat=u.role!=='worker'&&!u.moveTo&&!u.buildTarget&&!u.gatherTarget&&!hasOrder&&!u.stationed;
     if(isIdleCombat){
@@ -7986,10 +7993,10 @@ Game.prototype.updateBuilding=function(b,dt){
           u2.owner=b.owner;u2.pid=b.pid;u2.spawnT=0;
           u2.role=def.role;
           if(q.role==='hero'&&q.heroType) u2.heroType=q.heroType;
-          if(b.rallyPoint){
-            var rj=38;
-            u2.moveTo={x:b.rallyPoint.x+(Math.random()-0.5)*rj,y:b.rallyPoint.y+(Math.random()-0.5)*rj};
-            u2._path=null;u2._pathIdx=0;
+                    if(b.rallyPoint){
+            u2.moveTo={x:b.rallyPoint.x,y:b.rallyPoint.y};
+            u2._path=null;u2._pathIdx=0;u2._lastMoveTo=null;
+            u2.attackMoveTo=null;u2.target=null;u2.stationed=false;
           }
           this.units.push(u2);
           if(this.stats[b.pid]) this.stats[b.pid].unitsCreated++;
@@ -13222,15 +13229,17 @@ Renderer.prototype.drawWeaponDrop=function(w){
     ctx.globalAlpha=1;
   }
 
-          for(i=0;i<g.particles.active.length;i++){
+              for(i=0;i<g.particles.active.length;i++){
     var pa=g.particles.active[i];if(pa.dead) continue;
+    if(!g.isVisible(pa.x,pa.y)) continue;
     var sp2=this.w2s(pa.x,pa.y);
     ctx.globalAlpha=Math.max(0,pa.life/pa.maxLife);ctx.fillStyle=pa.color;
     ctx.beginPath();ctx.arc(sp2.x,sp2.y,pa.size*cam.zoom,0,TAU);ctx.fill();
   }
   ctx.globalAlpha=1;
-  for(i=0;i<g.floaters.length;i++){
+    for(i=0;i<g.floaters.length;i++){
     var ft=g.floaters[i];if(ft.dead) continue;
+    if(!g.isVisible(ft.x,ft.y)) continue;
     var sp3=this.w2s(ft.x,ft.y);
     ctx.globalAlpha=Math.min(1,ft.life/ft.maxLife*2);
     ctx.fillStyle=ft.color;ctx.font='bold '+(13*cam.zoom)+'px Arial';ctx.textAlign='center';
@@ -13375,7 +13384,7 @@ UISys.prototype.bindAll=function(){
       for(var _mi=0;_mi<Game_.units.length;_mi++){
         if(Game_.units[_mi].sel&&Game_.units[_mi].pid===Game_.playerPid&&!Game_.units[_mi].dying){hasSel=true;break;}
       }
-      var isDouble=(_mmLastClick>=0 && now-_mmLastClick<900);
+            var isDouble=(_mmLastClick>=0 && now-_mmLastClick<1200);
       if(hasSel&&isDouble){
         var _sel=[];
         for(var _mi2=0;_mi2<Game_.units.length;_mi2++){
@@ -14788,14 +14797,13 @@ UISys.prototype.renderActions=function(force){
             else tip+='\n\nМожно улучшить сейчас! Ульт улучшается на 6 / 8 / 10 уровнях.';
           }
         }
-        if(ab.type!=='passive') tip+='\nМана: '+(ab.mana||35)+' · Кулдаун: '+ab.cd+'с';
         if(ab.targeted) tip+='\nНаводимая: кликните по цели';
         if(_stunnedHero) tip+='\n\n⚠ ОГЛУШЁН — каст невозможен';
         var _btnCls='ability'+(canLvlUp?' can-level':'');
-        var _btn=self.addAction(box,toolIconImg(iconName,48),label,price,function(){
-          var shift=!!Input.shiftDown;
-          if(canLvlUp&&(shift||!canUse)){hero.abilityLevels[ab.id]=lvl+1;hero.skillPoints--;hero._recalc();self.renderActions(true);}
-          else if(canUse){
+                var _btn=self.addAction(box,toolIconImg(iconName,48),label,price,function(){
+          if(canLvlUp){
+            hero.abilityLevels[ab.id]=lvl+1;hero.skillPoints--;hero._recalc();self.renderActions(true);
+          } else if(canUse){
             if(ab.targeted){
               Input.clearPending('ability');
               Input.pendingTargetedAbility={hero:hero,ab:ab};
@@ -14808,6 +14816,23 @@ UISys.prototype.renderActions=function(force){
             }
           }
         },false,btnDisabled,tip,_btnCls);
+        if(_btn){
+          _btn.oncontextmenu=function(e){
+            e.preventDefault();
+            if(canUse){
+              if(ab.targeted){
+                Input.clearPending('ability');
+                Input.pendingTargetedAbility={hero:hero,ab:ab};
+                var _abShort2=t_(ab.k);
+                if(_abShort2===ab.k) _abShort2=(t_('ability_'+ab.id).split(':')[0]||ab.id);
+                self.showOrderBar(_abShort2+': выберите цель');
+                Audio.sfx('click');
+              } else {
+                g.castAbility(hero,ab.id);
+              }
+            }
+          };
+        }
         if(_btn){
           _btn.dataset.abId=ab.id;
           _btn.dataset.abIdx=String(abIdx);
@@ -15187,21 +15212,21 @@ else if(sel.length){
             var resU=g.getRes(g.playerPid);
             var canU=resU.gold>=udef.cost.gold&&resU.wood>=udef.cost.wood;
             var nameU=LC==='en'?udef.nameEn:udef.name;
-            var statsTxt=nameU;
-            statsTxt+='\nУрон: '+udef.atk+' / '+udef.atkCd+'с';
+                        var statsTxt=nameU;
+            statsTxt+='\nУрон за выстрел: '+udef.atk;
             statsTxt+='\nДальность: '+udef.rng;
-            statsTxt+='\nЗолото: '+udef.cost.gold;
-            statsTxt+='\nДерево: '+udef.cost.wood;
-            statsTxt+='\nВремя: '+udef.time+'с';
+            statsTxt+='\nСкорострельность: 1 / '+udef.atkCd+'с';
+            if(udef.hpBonus) statsTxt+='\nПрочность башни: +'+udef.hpBonus+' HP';
+            statsTxt+='\nСтоимость: '+udef.cost.gold+' зол., '+udef.cost.wood+' дер.';
+            statsTxt+='\nВремя улучшения: '+udef.time+'с';
             var dscParts=[];
-            if(udef.burnDmg) dscParts.push('Поджог '+udef.burnDmg+'/сек на '+udef.burnDur+'с.');
-            if(udef.aoe) dscParts.push('Урон по площади '+udef.aoe+'px ('+Math.round(udef.aoeEdge*100)+'% по краю).');
-            if(udef.healAmt) dscParts.push('Лечит '+udef.healAmt+' HP слабейшему союзнику в радиусе '+udef.healR+'px.');
-            if(udef.cone) dscParts.push('Конус атаки '+udef.cone+'°.');
-            if(udef.poisonDmg) dscParts.push('Яд '+udef.poisonDmg+'/сек на '+udef.poisonDur+'с (до '+udef.maxStacks+' стаков).');
-            if(udef.ignoreArmor) dscParts.push('Игнорирует броню цели.');
-            if(udef.hpBonus) dscParts.push('Даёт +'+udef.hpBonus+' HP к максимуму.');
-            statsTxt+='\n\n'+dscParts.join(' ');
+            if(udef.burnDmg) dscParts.push('Поджигает цель на '+udef.burnDmg+' урона/сек в течение '+udef.burnDur+'с');
+            if(udef.aoe) dscParts.push('Урон по площади радиусом '+udef.aoe+'px ('+Math.round(udef.aoeEdge*100)+'% урона по краям)');
+            if(udef.healAmt) dscParts.push('Лечит самого раненого союзника в радиусе '+udef.healR+'px на '+udef.healAmt+' HP');
+            if(udef.cone) dscParts.push('Стреляет конусом '+udef.cone+'°, задевая несколько целей');
+            if(udef.poisonDmg) dscParts.push('Отравляет: '+udef.poisonDmg+' урона/сек '+udef.poisonDur+'с (до '+udef.maxStacks+' стаков)');
+            if(udef.ignoreArmor) dscParts.push('Игнорирует броню цели');
+            if(dscParts.length) statsTxt+='\n\n'+dscParts.join('. ')+'.';
             self.addAction(box,toolIconImg('tower_'+uk,40),nameU,self.costStr(udef.cost.gold,udef.cost.wood),function(){
               if(b2._towerUpgrading||b2.towerUpgrade||b2._pendingUpgrade){g.notify('Башня уже улучшается');return;}
               var r2=g.getRes(g.playerPid);
@@ -15684,9 +15709,14 @@ function clearAllCaches(){
     var resume=function(){Audio.resume();if(UI) UI._hideWc3Tooltip();};
     canvas.addEventListener('mousedown',resume);
     canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
-    canvas.addEventListener('mousedown',function(e){
+        canvas.addEventListener('mousedown',function(e){
       if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
       var r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+      if(e.button===3 || e.button===4){
+        e.preventDefault();
+        if(Game_ && UI) UI.cycleActiveUnit(e.button===3 ? -1 : 1);
+        return;
+      }
       if(e.button===1){e.preventDefault();self.dragging={x:e.clientX,y:e.clientY};return;}
       if(e.button===0){self.mouseX=mx;self.mouseY=my;self.mouseInside=true;self.boxSelect={active:true,x1:mx,y1:my,x2:mx,y2:my,add:e.ctrlKey||e.shiftKey};}
       else if(e.button===2){
@@ -15749,7 +15779,7 @@ function clearAllCaches(){
       if(self.boxSelect&&self.boxSelect.active){if(e.target!==canvas) handleMouseUp(e);}
       if(self.dragging) self.dragging=null;
     });
-    canvas.addEventListener('wheel',function(e){
+        canvas.addEventListener('wheel',function(e){
       e.preventDefault();if(!Game_) return;
       if(e.shiftKey){
         self.formationAngle+=(e.deltaY>0?0.2:-0.2);
@@ -15757,17 +15787,6 @@ function clearAllCaches(){
         if(UI) UI.showHint('Строй: '+Math.round(self.formationAngle*180/Math.PI)+'°',1);
         return;
       }
-      if(e.ctrlKey||e.altKey||e.metaKey){
-        var fz=e.deltaY<0?1.15:0.87,minZ=getMinZoom();
-        Game_.camera.zoom=cl(Game_.camera.zoom*fz,minZ,3);clampCam();
-        return;
-      }
-      var cnt=0;
-      for(var _i=0;_i<Game_.units.length;_i++){
-        var _u=Game_.units[_i];
-        if(_u.sel&&_u.pid===Game_.playerPid&&!_u.dying) cnt++;
-      }
-      if(cnt>1){ if(UI) UI.cycleActiveUnit(e.deltaY<0?-1:1); return; }
       var f=e.deltaY<0?1.15:0.87,minZ2=getMinZoom();
       Game_.camera.zoom=cl(Game_.camera.zoom*f,minZ2,3);clampCam();
     },{passive:false});
@@ -16051,7 +16070,7 @@ canvas.addEventListener('touchstart',function(e){
     if(this.keys[K.camRight]) dx+=1;
     if(!this.isTouch&&!Settings._isMobile&&Settings.edgeScroll&&this.mouseInside&&Renderer_){
             // ПАТЧ J-31: на узких экранах не «съедаем» половину
-      var _zone=Math.max(40,Math.min(90,Renderer_.w*0.045));
+            var _zone=Math.max(60,Math.min(120,Renderer_.w*0.06));
       var _mx=this.mouseX,_my=this.mouseY,_w=Renderer_.w,_h=Renderer_.h;
       var _ex=0,_ey=0;
       if(_mx<_zone) _ex=-(1-_mx/_zone);
