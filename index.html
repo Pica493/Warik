@@ -10720,14 +10720,17 @@ AIController.prototype.microArmy=function(){
     myCombat.push(u);
   }
   if(myCombat.length<2) return;
+  
   var cx=0,cy=0;
   for(var a=0;a<myCombat.length;a++){cx+=myCombat[a].x;cy+=myCombat[a].y;}
   cx/=myCombat.length;cy/=myCombat.length;
+  
+  // Фокус: все бьют одну цель
   var focus=this.pickFocusTarget(cx,cy,1400);
   if(focus && !focus.dying){
     for(var b=0;b<myCombat.length;b++){
       var mu=myCombat[b];
-      if(mu.isHero) continue;
+      if(mu.isHero) continue; 
       if(!mu.target || mu.target.dying || (mu.target.isBuilding&&Math.random()<0.3)){
         if(mu.role!=='heal' && mu.role!=='siege'){
           mu.target=focus; mu.lockedTarget=focus;
@@ -10735,18 +10738,19 @@ AIController.prototype.microArmy=function(){
       }
     }
   }
+  
+  // Кайтинг: стрелки отбегают от милишников
   for(var k=0;k<myCombat.length;k++){
     var c=myCombat[k];
-    if(c.role!=='ranged'&&c.role!=='cav'&&c.role!=='fly'&&c.role!=='heal') continue;
     if(!c.target || c.target.dying) continue;
     var dist=Math.hypot(c.target.x-c.x,c.target.y-c.y);
     var dangerRange=(c.role==='cav')?60:(c.role==='ranged')?(c.range*0.55):(c.range*0.7);
-    if(dist<dangerRange && c.hp/c.maxHp<0.85){
+    if((c.role==='ranged'||c.role==='heal') && dist<dangerRange && c.hp/c.maxHp<0.9){
       var away=Math.atan2(c.y-c.target.y,c.x-c.target.x);
-      var nx=g.clampX(c.x+Math.cos(away)*80);
-      var ny=g.clampY(c.y+Math.sin(away)*80);
+      var nx=g.clampX(c.x+Math.cos(away)*120);
+      var ny=g.clampY(c.y+Math.sin(away)*120);
       if(!g._wouldHitBuilding(nx,ny,c.radius,null,false,-1)&&!g._wouldHitResource(nx,ny,c.radius,null)){
-        c.moveTo={x:nx,y:ny};c._path=null;c._pathIdx=0;
+        c.moveTo={x:nx,y:ny};c._path=null;c._pathIdx=0; c.attackMoveTo=null;
       }
     }
   }
@@ -10769,8 +10773,13 @@ AIController.prototype._getDesiredSplit=function(){
     var u=g.units[i];
     if(u.pid===this.pid&&u.role==='worker'&&!u.dying) workerCount++;
   }
-  var half=Math.max(3,Math.floor(workerCount/2));
-  return {gold:half, wood:Math.max(3, workerCount-half)};
+  // Умный лимит: максимум 5 на золото и 5 на дерево (10 всего).
+  var wantGold=Math.min(5,workerCount);
+  var wantWood=Math.min(5,workerCount-wantGold);
+  // Если золота мало, перенаправляем на золото (и наоборот)
+  var res=g.getRes(this.pid);
+  if(res.gold<300){wantGold=Math.min(7,workerCount);wantWood=Math.max(0,workerCount-wantGold);}
+  return {gold:wantGold, wood:wantWood};
 };
 AIController.prototype._updateKnownInfo=function(){
   var g=this.g;
@@ -10924,16 +10933,21 @@ AIController.prototype.tryBuild=function(){
   if(totalBuildings>=MAX_BOT_BUILDINGS) return;
 
 // Если бота атакуют — строим башни (до 4 штук)
-if(this._underHeavyAttack || this.underAttack){
-  if((builtCount.tower||0) < 4 && res.gold >= this.race.buildings.tower.gold && res.wood >= this.race.buildings.tower.wood){
-    var _twDef = this.race.buildings.tower;
-    var _twW = null;
-    for(var _twI=0;_twI<g.units.length;_twI++){ var _twU=g.units[_twI]; if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying && !_twU.buildTarget && !_twU.repairTarget){ _twW=_twU; break; } }
-    if(_twW && th){
-      for(var _twA=0;_twA<10;_twA++){
-        var _angT = Math.random()*Math.PI*2;
-        var _tx = th.x + Math.cos(_angT)*200;
-        var _ty = th.y + Math.sin(_angT)*200;
+  if(this._underHeavyAttack || this.underAttack){
+    if((builtCount.tower||0) < 4 && res.gold >= this.race.buildings.tower.gold && res.wood >= this.race.buildings.tower.wood){
+      var _twDef = this.race.buildings.tower;
+      var _twW = null;
+      for(var _twI=0;_twI<g.units.length;_twI++){ var _twU=g.units[_twI]; if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying && !_twU.buildTarget && !_twU.repairTarget){ _twW=_twU; break; } }
+      if(_twW && th){
+        // Ищем врага, который атакует, чтобы поставить башню в его сторону
+        var _threat = null;
+        for(var _ti=0; _ti<g.units.length; _ti++){
+          var _en = g.units[_ti];
+          if(_en.team !== this.team && !_en.dying && Math.hypot(_en.x-th.x, _en.y-th.y) < 800){ _threat = _en; break; }
+        }
+        var _angT = _threat ? Math.atan2(_threat.y-th.y, _threat.x-th.x) : Math.random()*Math.PI*2;
+        var _tx = th.x + Math.cos(_angT)*180;
+        var _ty = th.y + Math.sin(_angT)*180;
         var _okT = true;
         if(_tx<50||_ty<50||_tx>g.W-50||_ty>g.H-50) _okT=false;
         if(_okT) for(var _obT=0;_obT<g.buildings.length;_obT++){ var _bbT=g.buildings[_obT]; if(Math.hypot(_bbT.x-_tx,_bbT.y-_ty)<_bbT.radius+110){_okT=false;break;} }
@@ -10948,7 +10962,6 @@ if(this._underHeavyAttack || this.underAttack){
       }
     }
   }
-}
   
   if(!th){
     var thDef0=this.race.buildings.townhall;
@@ -11104,15 +11117,24 @@ AIController.prototype.tryTrain=function(){
     if(pu.isHero) continue;
     if(curCount[pu.role]!==undefined){curCount[pu.role]++;totalCombat++;}
   }
-  var desired={melee:0.30,ranged:0.22,spear:0.15,cav:0.10,elite:0.05,heal:0.08,fly:0.05,siege:0.05};
+    var desired={melee:0.30,ranged:0.22,spear:0.15,cav:0.10,elite:0.05,heal:0.08,fly:0.05,siege:0.05};
   var ec=this.getEnemyComposition();
-  if(ec.cav>2){ desired.spear+=0.10; desired.cav-=0.05; }
-  if(ec.fly>=3){ desired.ranged+=0.20; desired.melee-=0.05; }
-  if(ec.fly>=6){ desired.ranged+=0.25; desired.melee-=0.05; desired.spear-=0.05; }
-  if(ec.melee>3){ desired.ranged+=0.05; desired.elite+=0.05; desired.melee-=0.05; }
-  if(ec.ranged>2){ desired.cav+=0.08; desired.melee-=0.04; }
-  if(ec.elite>1){ desired.siege+=0.05; desired.spear+=0.03; }
-  if(ec.siege>0){ desired.cav+=0.05; }
+  // АГРЕССИВНЫЙ КОНТР-БИЛД
+  if(ec.cav>2){ 
+    desired.spear+=0.25; // Враг строит кавалерию -> спамим копейщиков
+    desired.cav=0; 
+  }
+  if(ec.fly>=3){ 
+    desired.ranged+=0.35; // Враг строит летунов -> спамим стрелков
+    desired.melee-=0.15; 
+  }
+  if(ec.ranged>2){ 
+    desired.cav+=0.20; // Враг строит стрелков -> спамим кавалерию
+    desired.melee-=0.10; 
+  }
+  if(ec.elite>1){ 
+    desired.siege+=0.15; // Враг строит танков -> спамим осадных
+  }
   if(thLvl<2){ desired.cav=0; desired.siege=0; }
   if(thLvl<3){ desired.elite=0; desired.heal=0; desired.fly=0; }
   
@@ -11723,11 +11745,15 @@ AIController.prototype.retreatWounded=function(){
   for(var i=0;i<g.units.length;i++){
     var u=g.units[i];
     if(u.pid!==this.pid||u.role==='worker'||u.dying) continue;
-    if(u.hp/u.maxHp>0.35){
-      if(u._retreating && u.hp/u.maxHp>=0.70) u._retreating=false;
+    
+    // Отступаем при 50% HP (раньше было 35%, бот поздно спохватывался)
+    var _thresh = (u.role==='heal') ? 0.7 : 0.5;
+    if(u.hp/u.maxHp > _thresh){
+      if(u._retreating && u.hp/u.maxHp>=0.8) u._retreating=false;
       continue;
     }
     if(u._retreating) continue;
+    
     u._retreating=true;
     u.target=null;u.lockedTarget=null;u.attackMoveTo=null;u.patrolRoute=null;
     u._armyTag=null;
@@ -11739,7 +11765,7 @@ AIController.prototype.retreatWounded=function(){
       var dTh=Math.hypot(bld.x-u.x,bld.y-u.y);
       if(dTh<bdTh){bdTh=dTh;th=bld;}
     }
-    u.moveTo={x:th?th.x:this.homeX,y:th?th.y:this.homeY};
+    u.moveTo={x:th?th.x+(Math.random()-0.5)*60:this.homeX,y:th?th.y+(Math.random()-0.5)*60:this.homeY};
     u._path=null;u._pathIdx=0;
   }
 };
@@ -12291,57 +12317,51 @@ AIController.prototype.rebalanceGoldWorkers=function(){
   }
 };
 AIController.prototype.pickFocusTarget=function(cx,cy,radius){
-  var g=this.g;cx=(typeof cx==='number')?cx:this.homeX;cy=(typeof cy==='number')?cy:this.homeY;radius=radius||2000;
-  var best=null,bestScore=-1e9,r2=radius*radius;
+  var g=this.g;
+  cx=(typeof cx==='number')?cx:this.homeX;
+  cy=(typeof cy==='number')?cy:this.homeY;
+  radius=radius||2000;
+  
+  var best=null, bestScore=-1e9, r2=radius*radius;
+  
+  // ЖЕСТКИЙ ПРИОРИТЕТ ЦЕЛЕЙ
   for(var i=0;i<g.units.length;i++){
-    var u=g.units[i];if(u.team===this.team||u.dead||u.dying) continue;
-    var d2=(u.x-cx)*(u.x-cx)+(u.y-cy)*(u.y-cy);if(d2>r2) continue;
-    var d=Math.sqrt(d2),hpPct=u.hp/u.maxHp,score=(1-hpPct)*120-d*0.05;
-    if(u.isHero) score+=45;if(u.role==='heal') score+=35;if(u.role==='siege') score+=20;if(u.role==='worker') score-=25;
+    var u=g.units[i];
+    if(u.team===this.team || u.dying || u.dead) continue;
+    var d2=(u.x-cx)*(u.x-cx)+(u.y-cy)*(u.y-cy);
+    if(d2>r2) continue;
+    
+    var d=Math.sqrt(d2);
+    var hpPct = u.hp/u.maxHp;
+    var score = (1-hpPct)*100 - d*0.05;
+    
+    if(u.isHero) score += 500; // Герой - главная цель!
+    else if(u.role==='heal') score += 300; // Лекари
+    else if(u.role==='siege') score += 150; // Осадные
+    else if(u.role==='ranged') score += 100; // Стрелки
+    else if(u.role==='worker') score -= 200; // Рабочих бьем в последнюю очередь
+    
+    if(hpPct < 0.25) score += 400; // Добиваем раненых!
+    
     if(score>bestScore){bestScore=score;best=u;}
   }
-  if(best) return best;
-  for(var bi=0;bi<g.buildings.length;bi++){
-    var b=g.buildings[bi];if(b.team===this.team||b.dead) continue;
-    var d2b=(b.x-cx)*(b.x-cx)+(b.y-cy)*(b.y-cy);if(d2b>r2) continue;
-    var db=Math.sqrt(d2b),hpPctB=b.hp/b.maxHp,scoreB=(1-hpPctB)*80-db*0.05;
-    if(b.kind==='townhall') scoreB+=30;if(b.kind==='tower') scoreB+=10;
-    if(scoreB>bestScore){bestScore=scoreB;best=b;}
-  }
-  if(best&&best.isBuilding&&best.kind==='townhall'){
-    var alt=null,altD=Infinity;
-    for(var ti=0;ti<g.buildings.length;ti++){
-      var tb=g.buildings[ti];
-      if(tb.team===this.team||tb.dead) continue;
-      if(tb.kind!=='barracks'&&tb.kind!=='forge'&&tb.kind!=='lumber'&&tb.kind!=='magic') continue;
-      var dAlt=Math.hypot(tb.x-cx,tb.y-cy);
-      if(dAlt<altD){altD=dAlt;alt=tb;}
-    }
-    if(!alt && this.knownEnemyBuildings){
-      for(var _pk in this.knownEnemyBuildings){
-        var _kb=this.knownEnemyBuildings[_pk];
-        if(_kb.kind!=='barracks'&&_kb.kind!=='forge'&&_kb.kind!=='lumber'&&_kb.kind!=='magic') continue;
-        var _kd=Math.hypot(_kb.x-cx,_kb.y-cy);
-        if(_kd<_altD){_altD=_kd;alt={x:_kb.x,y:_kb.y,kind:_kb.kind,isBuilding:true,dead:false};}
-      }
-    }
-    if(alt&&altD<800) return alt;
-  }
-  if(best){
-    var danger=0;
-    for(var tbi2=0;tbi2<g.buildings.length;tbi2++){var tb2=g.buildings[tbi2];if(tb2.team===this.team||tb2.dead||tb2.kind!=='tower') continue;if(Math.hypot(tb2.x-best.x,tb2.y-best.y)<300) danger++;}
-    if(danger>=2){
-      for(var bi2=0;bi2<g.buildings.length;bi2++){
-        var bb=g.buildings[bi2];if(bb.team===this.team||bb.dead) continue;
-        if(bb.kind==='barracks'||bb.kind==='forge'||bb.kind==='lumber'){
-          var cnt=0;
-          for(var tbi3=0;tbi3<g.buildings.length;tbi3++){var tb3=g.buildings[tbi3];if(tb3.team===this.team||tb3.dead||tb3.kind!=='tower') continue;if(Math.hypot(tb3.x-bb.x,tb3.y-bb.y)<300) cnt++;}
-          if(cnt<2) return bb;
-        }
-      }
+  
+  // Если армии нет - бьем здания
+  if(!best){
+    for(var bi=0;bi<g.buildings.length;bi++){
+      var b=g.buildings[bi];
+      if(b.team===this.team||b.dead) continue;
+      var d2b=(b.x-cx)*(b.x-cx)+(b.y-cy)*(b.y-cy);
+      if(d2b>r2) continue;
+      var db=Math.sqrt(d2b), hpPctB=b.hp/b.maxHp;
+      var scoreB = (1-hpPctB)*80 - db*0.05;
+      if(b.kind==='townhall') scoreB += 30;
+      if(b.kind==='tower') scoreB += 10;
+      if(scoreB>bestScore){bestScore=scoreB;best=b;}
     }
   }
   return best;
+};
 };
 AIController.prototype.getEnemyComposition=function(){
   var g=this.g;var c={cav:0,fly:0,ranged:0,spear:0,melee:0,elite:0,siege:0};
