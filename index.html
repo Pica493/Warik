@@ -12579,7 +12579,22 @@ AIController.prototype.getEnemyComposition=function(){
     if(flipX){ctx.save();ctx.translate(p.x,0);ctx.scale(-1,1);this._legs(u,{x:0,y:p.y},s);ctx.restore();}
     else this._legs(u,p,s);
   }
-  var drawY=p.y-sp.height*s*0.94-bob;
+    var drawY=p.y-sp.height*s*0.94-bob;
+  // ПАТЧ 3.2: Функция для рисования рук и оружия
+  var _self=this;
+  var _drawArmsWeapon=function(){
+    if(u.role==='cav'||u.role==='siege'||u.role==='fly'||_isVariantHero) return;
+    _self._arms(u,p,s,flipX);
+    if(u._handScreenX!==null && u._handScreenX!==undefined){
+      var _a2=Math.max(0,Math.min(1,u.attackT||0)),_c2=Math.max(0,Math.min(1,u.chopT||0)),_k2=Math.max(0,Math.min(1,u.castT||0));
+      var _castHeal=(u.role==='heal')?Math.max(_a2,_k2):_k2;
+      ctx.save();ctx.translate(u._handScreenX,u._handScreenY);ctx.scale(flipX?-1:1,1);
+      _self._mainW(ctx,u.role,u.race,_a2,_c2,_castHeal,s);
+      ctx.restore();
+    }
+  };
+  // При ходьбе вверх руки и оружие рисуются ДО спрайта (за спиной)
+  if(u.dir===DIR.UP) _drawArmsWeapon();
   if(flipX){ctx.save();ctx.translate(p.x,0);ctx.scale(-1,1);ctx.drawImage(sp,-sp.width*s/2,drawY,sp.width*s,sp.height*s);ctx.restore();}
   else ctx.drawImage(sp,p.x-sp.width*s/2,drawY,sp.width*s,sp.height*s);
   if(u.role==='siege'&&!u.dying){
@@ -12623,26 +12638,15 @@ AIController.prototype.getEnemyComposition=function(){
         ctx.strokeStyle='#3a2010';ctx.lineWidth=1.2*s;ctx.stroke();
         ctx.strokeStyle='#a07840';ctx.lineWidth=2*s;ctx.beginPath();ctx.arc(cx2,cy2,r*0.9,0,TAU);ctx.stroke();
       };
-      drawWoodWheelRt(wc1,wy2,wR3,wheelRot);
+            drawWoodWheelRt(wc1,wy2,wR3,wheelRot);
       drawWoodWheelRt(wc2,wy2,wR3,wheelRot);
     }
   }
-        if(u.role!=='cav'&&u.role!=='siege'&&u.role!=='fly'&&!_isVariantHero){
-    if(u.dir !== DIR.UP) {
-      this._arms(u,p,s,flipX);
-    } else {
-      u._handScreenX = null; u._handScreenY = null;
-    }
-    if(u._handScreenX!==null && u._handScreenX!==undefined){
-      var atk2=Math.max(0,Math.min(1,u.attackT||0)),chop2=Math.max(0,Math.min(1,u.chopT||0)),cast2=Math.max(0,Math.min(1,u.castT||0));
-      var _castForHeal=(u.role==='heal')?Math.max(atk2,cast2):cast2;
-      ctx.save();ctx.translate(u._handScreenX,u._handScreenY);ctx.scale(flipX?-1:1,1);
-      this._mainW(ctx,u.role,u.race,atk2,chop2,_castForHeal,s);
-      ctx.restore();
-    }
-  } else {
-    u._handScreenX=null;u._handScreenY=null;
-  }
+  
+  // ПАТЧ 3.2b: Руки СПЕРЕДИ для всех направлений, КРОМЕ ходьбы вверх
+  // (при ходьбе вверх они уже нарисованы ЗА спиной выше)
+  if(u.dir!==DIR.UP) _drawArmsWeapon();
+        
   if(u.hitFlash>0&&!u.dying){
     ctx.save();ctx.globalAlpha=Math.min(0.6,u.hitFlash*3)*vf;ctx.fillStyle='#ff3838';
     ctx.beginPath();ctx.ellipse(p.x,drawY+sp.height*s*0.5,sp.width*s*0.4,sp.height*s*0.4,0,0,TAU);ctx.fill();ctx.restore();
