@@ -1838,38 +1838,21 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.stroke();
 }
 else if(heroType==='shaman'){
-  /* ПАТЧ 7.1: геометрия приведена к side-версии.
-     - голова выше (28 вместо 34) — как в drawShamanSide (там 26 при baseY=86)
-     - ряса длиннее (bh+13 вместо bh+4) — скрывает ноги почти до пола, как в side
-     - посох тянется от головы до земли (длина ~60) с черепом на вершине — как в side */
-  var _shHeadY = bodyBaseY-bh-14;   // = 34-6 = 28 при стандартных значениях
-  var _shRobeH = bh+13;             // удлинённая ряса
-  var _shStaffTop = bodyBaseY-bh-28; // ~14
-  var _shStaffBot = baseY-6;         // ~80
-  var _shSkullY = _shStaffTop+4;     // на вершине посоха
+  var _shHeadY = bodyBaseY-bh-14;
+  var _shRobeH = bh+13;
+  var _shStaffTop = bodyBaseY-bh-28;
+  var _shStaffBot = baseY-6;
+  var _shSkullY = _shStaffTop+4;
 
-  /* Ноги (рисуем первыми — ряса их прикроет) */
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-6,bodyBaseY,5,legH);ctx.fillRect(cx+1,bodyBaseY,5,legH);
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.strokeRect(cx-6,bodyBaseY,5,legH);ctx.strokeRect(cx+1,bodyBaseY,5,legH);
 
-  /* Ряса */
   var sg=ctx.createLinearGradient(cx-12,0,cx+12,0);
   sg.addColorStop(0,'#1a0808');sg.addColorStop(0.5,'#5a1a1a');sg.addColorStop(1,'#1a0808');
   ctx.fillStyle=sg;
   roundRect(ctx,cx-12,bodyBaseY-bh,24,_shRobeH,3);ctx.fill();
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1.4;ctx.stroke();
-  /* Неровный низ рясы */
-  ctx.beginPath();
-  ctx.moveTo(cx-12,bodyBaseY-bh+_shRobeH-2);
-  for(var _svi=0;_svi<6;_svi++){
-    var _svx=cx-12+_svi*4;
-    ctx.lineTo(_svx+2,bodyBaseY-bh+_shRobeH+4-(_svi%2)*4);
-    ctx.lineTo(_svx+4,bodyBaseY-bh+_shRobeH-2);
-  }
-  ctx.closePath();ctx.fillStyle='#1a0808';ctx.fill();
-  ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.stroke();
 
-  /* Костяные пластины спереди */
   if(!isBack){
     ctx.fillStyle='#e0d8c0';
     for(var _bi3=0;_bi3<5;_bi3++){
@@ -1879,76 +1862,57 @@ else if(heroType==='shaman'){
     }
   }
 
-    /* Рука к посоху */
-  ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(cx+10,bodyBaseY-bh+10);ctx.lineTo(cx+16,bodyBaseY-bh+16);ctx.stroke();
-  ctx.lineCap='butt';
-
-  /* Левая рука с кинжалом */
-  ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(cx-9,bodyBaseY-bh+10);ctx.lineTo(cx-4,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+22);ctx.stroke();
-  ctx.strokeStyle='#4a6a28';ctx.lineWidth=1.2;
-  ctx.beginPath();ctx.moveTo(cx-9,bodyBaseY-bh+10);ctx.lineTo(cx-4,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+22);ctx.stroke();
-  ctx.fillStyle=skinPal.skin;
-  ctx.beginPath();ctx.arc(cx+12,bodyBaseY-bh+22,2.4,0,TAU);ctx.fill();
-  ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
-  ctx.lineCap='butt';
-
-  /* Шея */
   ctx.fillStyle=skinPal.skin;
   ctx.fillRect(cx-3,_shHeadY+headR-3,6,8);
   ctx.strokeStyle=skinPal.skinD;ctx.lineWidth=1;
   ctx.strokeRect(cx-3,_shHeadY+headR-3,6,8);
 
-  /* Капюшон сзади */
-  ctx.fillStyle='#1a0808';
-  ctx.beginPath();
-  ctx.moveTo(cx-headR-3,_shHeadY+headR);
-  ctx.quadraticCurveTo(cx-headR-4,_shHeadY-headR-3,cx,_shHeadY-headR-6);
-  ctx.quadraticCurveTo(cx+headR+4,_shHeadY-headR-3,cx+headR+3,_shHeadY+headR);
-  ctx.closePath();ctx.fill();
-  ctx.strokeStyle='#0a0404';ctx.lineWidth=1.2;ctx.stroke();
-
-  /* Голова */
   var hgS=ctx.createRadialGradient(cx-2,_shHeadY-2,1,cx,_shHeadY,headR);
   hgS.addColorStop(0,skinPal.skinL);hgS.addColorStop(0.7,skinPal.skin);hgS.addColorStop(1,skinPal.skinD);
   ctx.fillStyle=hgS;ctx.beginPath();ctx.arc(cx,_shHeadY,headR,0,TAU);ctx.fill();
   ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
 
-  /* Лицо — только спереди */
   if(!isBack){
-    /* Ритуальные шрамы */
     ctx.strokeStyle='#a04040';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(cx-5,_shHeadY-2);ctx.lineTo(cx-3,_shHeadY+3);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx+6,_shHeadY-4);ctx.lineTo(cx+4,_shHeadY+1);ctx.stroke();
-    /* Светящиеся глаза */
     var eg=ctx.createRadialGradient(cx-3,_shHeadY+1,0.3,cx-3,_shHeadY+1,3);
     eg.addColorStop(0,'#fff');eg.addColorStop(0.4,'#ff8020');eg.addColorStop(1,'rgba(180,40,0,0)');
     ctx.fillStyle=eg;ctx.beginPath();ctx.arc(cx-3,_shHeadY+1,3,0,TAU);ctx.fill();
     var eg2=ctx.createRadialGradient(cx+3,_shHeadY+1,0.3,cx+3,_shHeadY+1,3);
     eg2.addColorStop(0,'#fff');eg2.addColorStop(0.4,'#ff8020');eg2.addColorStop(1,'rgba(180,40,0,0)');
     ctx.fillStyle=eg2;ctx.beginPath();ctx.arc(cx+3,_shHeadY+1,3,0,TAU);ctx.fill();
-       /* Клыки */
     ctx.fillStyle='#f0e8d0';
     ctx.beginPath();ctx.moveTo(cx-3,_shHeadY+6);ctx.lineTo(cx-2.5,_shHeadY+9);ctx.lineTo(cx-1.5,_shHeadY+6);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(cx+3,_shHeadY+6);ctx.lineTo(cx+2.5,_shHeadY+9);ctx.lineTo(cx+1.5,_shHeadY+6);ctx.closePath();ctx.fill();
-  } else {
-    /* ПАТЧ: посох сзади (зеркально) */
-    var _sgn=-1;
+  }
+
+  var _staffX = isBack ? cx-16 : cx+16;
+  ctx.strokeStyle='#3a2010';ctx.lineWidth=2.6;
+  ctx.beginPath();ctx.moveTo(_staffX,_shStaffTop);ctx.lineTo(_staffX,_shStaffBot);ctx.stroke();
+  ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(_staffX,_shStaffTop);ctx.lineTo(_staffX,_shStaffBot);ctx.stroke();
+
+  ctx.fillStyle='#e8e0d0';ctx.beginPath();ctx.arc(_staffX,_shSkullY,5.5,0,TAU);ctx.fill();
+  ctx.strokeStyle='#3a2010';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='#0a0000';
+  ctx.beginPath();ctx.arc(_staffX-2,_shSkullY-1,1.4,0,TAU);ctx.arc(_staffX+2,_shSkullY-1,1.4,0,TAU);ctx.fill();
+  ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(_staffX-4,_shSkullY-4);ctx.lineTo(_staffX-6,_shSkullY-8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(_staffX+4,_shSkullY-4);ctx.lineTo(_staffX+6,_shSkullY-8);ctx.stroke();
+
+  if(!isBack){
     ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
-    ctx.beginPath();ctx.moveTo(cx+_sgn*10,bodyBaseY-bh+10);ctx.lineTo(cx+_sgn*16,bodyBaseY-bh+16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+10,bodyBaseY-bh+10);ctx.lineTo(_staffX,bodyBaseY-bh+16);ctx.stroke();
     ctx.lineCap='butt';
-    ctx.strokeStyle='#3a2010';ctx.lineWidth=2.6;
-    ctx.beginPath();ctx.moveTo(cx+_sgn*16,_shStaffTop);ctx.lineTo(cx+_sgn*16,_shStaffBot);ctx.stroke();
-    ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(cx+_sgn*16,_shStaffTop);ctx.lineTo(cx+_sgn*16,_shStaffBot);ctx.stroke();
-    ctx.fillStyle='#e8e0d0';ctx.beginPath();ctx.arc(cx+_sgn*16,_shSkullY,5,0,TAU);ctx.fill();
-    ctx.strokeStyle='#3a2010';ctx.lineWidth=1;ctx.stroke();
-    ctx.fillStyle='#0a0000';
-    ctx.beginPath();ctx.arc(cx+_sgn*14,_shSkullY-1,1.4,0,TAU);ctx.arc(cx+_sgn*18,_shSkullY-1,1.4,0,TAU);ctx.fill();
-    ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(cx+_sgn*12,_shSkullY-4);ctx.lineTo(cx+_sgn*9,_shSkullY-8);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx+_sgn*20,_shSkullY-4);ctx.lineTo(cx+_sgn*23,_shSkullY-8);ctx.stroke();
+    ctx.strokeStyle='#7a9a52';ctx.lineWidth=3;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(cx-9,bodyBaseY-bh+10);ctx.lineTo(cx-4,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+22);ctx.stroke();
+    ctx.strokeStyle='#4a6a28';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(cx-9,bodyBaseY-bh+10);ctx.lineTo(cx-4,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+22);ctx.stroke();
+    ctx.fillStyle=skinPal.skin;
+    ctx.beginPath();ctx.arc(cx+12,bodyBaseY-bh+22,2.4,0,TAU);ctx.fill();
+    ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
+    ctx.lineCap='butt';
   }
 }
 else if(heroType==='hunter'){
@@ -7478,7 +7442,14 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
       u._lastStuckX=u.x;u._lastStuckY=u.y;
     }
   }
-  if(u.dying){u.deathT+=dt;if(u.deathT>1.6){u.dead=true;if(!u._isSummon)this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));}return;}
+    if(u.dying){
+    u.deathT += dt;
+    if(u.deathT > 1.2 || u.deathT === 0) {
+      u.dead = true;
+      if(!u._isSummon) this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));
+    }
+    return;
+  }
     if(u.hp<=0){
     u.dying=true;u.deathT=0;
     // ПАТЧ J-29: при UP/DOWN — случайно влево/вправо, не всегда вправо
@@ -7676,7 +7647,11 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
   c._prevX=c.x;c._prevY=c.y;
   if(c.stunT>0) c.stunT-=dt;
   if(c.bleedT>0){c.bleedT-=dt;c.hp-=(c.bleedDmg||0)*dt;if(c.bleedT<=0)c.bleedDmg=0;}
-  if(c.dying){c.deathT+=dt;if(c.deathT>1.2) c.dead=true;return;}
+    if(c.dying){
+    c.deathT += dt;
+    if(c.deathT > 1.0 || c.deathT === 0) c.dead = true;
+    return;
+  }
     if(c.hp<=0){
     c.dying=true;c.deathT=0;
     // ПАТЧ J-29b
@@ -12424,6 +12399,7 @@ AIController.prototype.getEnemyComposition=function(){
 };
 
       Renderer.prototype.drawUnit=function(u){
+  if(u._insideMine) return;
   var ctx=this.ctx,z=this.g.camera.zoom;
   var _alpha=this._frameAlpha!==undefined?this._frameAlpha:1;
   var _ix=(u._prevX!==undefined&&!u.dying)?(u._prevX+(u.x-u._prevX)*_alpha):u.x;
@@ -12437,7 +12413,8 @@ AIController.prototype.getEnemyComposition=function(){
     alpha=1-tt*0.7;
   }
   var vf=u._visFade!==undefined?u._visFade:1;
-  if(u._isTotem){
+    if(u._isTotem){
+    if(u.dying) return;
     var _tsc=z*0.55;
     ctx.save();
     var _totAlpha=(u._summonT>2?0.95:Math.max(0,u._summonT/2));
@@ -12650,8 +12627,12 @@ AIController.prototype.getEnemyComposition=function(){
       drawWoodWheelRt(wc2,wy2,wR3,wheelRot);
     }
   }
-    if(u.role!=='cav'&&u.role!=='siege'&&u.role!=='fly'&&!_isVariantHero){
-    this._arms(u,p,s,flipX);
+        if(u.role!=='cav'&&u.role!=='siege'&&u.role!=='fly'&&!_isVariantHero){
+    if(u.dir !== DIR.UP) {
+      this._arms(u,p,s,flipX);
+    } else {
+      u._handScreenX = null; u._handScreenY = null;
+    }
     if(u._handScreenX!==null && u._handScreenX!==undefined){
       var atk2=Math.max(0,Math.min(1,u.attackT||0)),chop2=Math.max(0,Math.min(1,u.chopT||0)),cast2=Math.max(0,Math.min(1,u.castT||0));
       var _castForHeal=(u.role==='heal')?Math.max(atk2,cast2):cast2;
@@ -14089,7 +14070,7 @@ UISys.prototype.refreshUnitBar=function(){
   var stillThere=false;
   for(var sj=0;sj<sel.length;sj++){if(sel[sj].id===activeId){stillThere=true;break;}}
   if(!stillThere){activeId=sel[0].id;this._activeUnitId=activeId;}
-  if(bar.dataset.hash!==hash||bar.dataset.active!==String(activeId)){
+    if(bar.dataset.hash!==hash||bar.dataset.active!==String(activeId)||bar.children.length!==sel.length){
     bar.dataset.hash=hash;bar.dataset.active=String(activeId);
     bar.innerHTML='';
     for(var si=0;si<sel.length;si++){
@@ -15114,15 +15095,15 @@ else if(sel.length){
             (function(rr){
               var def=RACES[b2.race].units[rr];if(!def) return;
               var priceU=self.costStr(def.gold,def.wood)+self.foodStr(rr);
-              var tipU=uName(b2.race,rr)
-  +'\nHP: '+def.hp
-  +'\nУрон: '+def.dmg
-  +'\nДальность: '+def.range
-  +'\nСкорость: '+def.spd
-  +'\nЗолото: '+def.gold
-  +'\nДерево: '+def.wood
-  +'\nЕда: '+(FOOD_COST[rr]||1)
-  +'\nВремя: '+def.time+'с'
+                            var tipU=uName(b2.race,rr)
+  +'\nHP: '+def.hp+toolIconImg('hp')
+  +'\nУрон: '+def.dmg+toolIconImg('weapon_melee')
+  +'\nДальность: '+def.range+toolIconImg('range')
+  +'\nСкорость: '+def.spd+toolIconImg('speed')
+  +'\nЗолото: '+def.gold+toolIconImg('gold')
+  +'\nДерево: '+def.wood+toolIconImg('wood')
+  +'\nЕда: '+(FOOD_COST[rr]||1)+toolIconImg('meat')
+  +'\nВремя: '+def.time+'с'+toolIconImg('time')
   +'\n'+t_('u_'+rr+'_desc');
               if(busyForge) tipU='Кузница занята улучшением — найм недоступен\n\n'+tipU;
               self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU,function(){self.queueUnit(b2,rr);},false,!!busyForge,tipU);
@@ -15284,13 +15265,13 @@ else if(sel.length){
             var resU=g.getRes(g.playerPid);
             var canU=resU.gold>=udef.cost.gold&&resU.wood>=udef.cost.wood;
             var nameU=LC==='en'?udef.nameEn:udef.name;
-                        var statsTxt=nameU;
-            statsTxt+='\nУрон за выстрел: '+udef.atk;
-            statsTxt+='\nДальность: '+udef.rng;
-            statsTxt+='\nСкорострельность: 1 / '+udef.atkCd+'с';
-            if(udef.hpBonus) statsTxt+='\nПрочность башни: +'+udef.hpBonus+' HP';
-            statsTxt+='\nСтоимость: '+udef.cost.gold+' зол., '+udef.cost.wood+' дер.';
-            statsTxt+='\nВремя улучшения: '+udef.time+'с';
+                                                var statsTxt=nameU;
+            statsTxt+='\nУрон за выстрел: '+udef.atk+toolIconImg('weapon_melee');
+            statsTxt+='\nДальность: '+udef.rng+toolIconImg('range');
+            statsTxt+='\nСкорострельность: 1 / '+udef.atkCd+'с'+toolIconImg('time');
+            if(udef.hpBonus) statsTxt+='\nПрочность башни: +'+udef.hpBonus+' HP'+toolIconImg('hp');
+            statsTxt+='\nСтоимость: '+udef.cost.gold+' зол.'+toolIconImg('gold')+', '+udef.cost.wood+' дер.'+toolIconImg('wood');
+            statsTxt+='\nВремя улучшения: '+udef.time+'с'+toolIconImg('time');
             var dscParts=[];
             if(udef.burnDmg) dscParts.push('Поджигает цель на '+udef.burnDmg+' урона/сек в течение '+udef.burnDur+'с');
             if(udef.aoe) dscParts.push('Урон по площади радиусом '+udef.aoe+'px ('+Math.round(udef.aoeEdge*100)+'% урона по краям)');
@@ -16064,18 +16045,45 @@ window.addEventListener('keyup',function(e){self.keys[e.key.toLowerCase()]=false
 canvas.addEventListener('touchstart',function(e){
   if(!Game_) return;Audio.resume();self.isTouch=true;
   var r=canvas.getBoundingClientRect();
-  if(e.touches.length===1){var tt=e.touches[0],tx=tt.clientX-r.left,ty=tt.clientY-r.top;self.mouseX=tx;self.mouseY=ty;self.mouseInside=true;self.touchStart={x0:tx,y0:ty,lastX:tx,lastY:ty,moved:false,t0:performance.now()};self.pinchDist=0;}
+    if(e.touches.length===1){
+    var tt=e.touches[0],tx=tt.clientX-r.left,ty=tt.clientY-r.top;
+    self.mouseX=tx;self.mouseY=ty;self.mouseInside=true;
+    self.touchStart={x0:tx,y0:ty,lastX:tx,lastY:ty,moved:false,t0:performance.now(),selectMode:false};
+    self.pinchDist=0;
+    clearTimeout(self._holdTimer);
+    self._holdTimer=setTimeout(function(){
+      if(self.touchStart && !self.touchStart.moved){
+        self.touchStart.selectMode = true;
+      }
+    }, 300);
+  }
   else if(e.touches.length===2){var t1=e.touches[0],t2=e.touches[1];self.pinchDist=Math.hypot(t2.clientX-t1.clientX,t2.clientY-t1.clientY);self.touchStart=null;}
 },{passive:true});
 
             canvas.addEventListener('touchmove',function(e){
       if(!Game_) return;e.preventDefault();self.isTouch=true;
       var r=canvas.getBoundingClientRect();
-      if(e.touches.length===1&&self.touchStart){
+            if(e.touches.length===1&&self.touchStart){
         var t=e.touches[0],cx=t.clientX-r.left,cy=t.clientY-r.top,dx=cx-self.touchStart.lastX,dy=cy-self.touchStart.lastY;
         self.touchStart.lastX=cx;self.touchStart.lastY=cy;
-        if(Math.abs(cx-self.touchStart.x0)>8||Math.abs(cy-self.touchStart.y0)>8) self.touchStart.moved=true;
-        if(self.touchStart.moved){Game_.camera.x-=dx/Game_.camera.zoom;Game_.camera.y-=dy/Game_.camera.zoom;clampCam();}
+        if(Math.abs(cx-self.touchStart.x0)>8||Math.abs(cy-self.touchStart.y0)>8){
+          self.touchStart.moved=true;
+          clearTimeout(self._holdTimer);
+        }
+        if(self.touchStart.selectMode){
+          if(!self.touchStart.boxSelect){
+            self.touchStart.boxSelect = { x1: self.touchStart.x0, y1: self.touchStart.y0, x2: cx, y2: cy, add: false };
+          } else {
+            self.touchStart.boxSelect.x2 = cx;
+            self.touchStart.boxSelect.y2 = cy;
+          }
+          return;
+        }
+        if(self.touchStart.moved){
+          Game_.camera.x-=dx/Game_.camera.zoom;
+          Game_.camera.y-=dy/Game_.camera.zoom;
+          clampCam();
+        }
       } else if(e.touches.length===2){
         var t1=e.touches[0],t2=e.touches[1],d=Math.hypot(t2.clientX-t1.clientX,t2.clientY-t1.clientY);
         var cx2=(t1.clientX+t2.clientX)/2-r.left,cy2=(t1.clientY+t2.clientY)/2-r.top;
@@ -16086,6 +16094,15 @@ canvas.addEventListener('touchstart',function(e){
     canvas.addEventListener('touchend',function(e){
       if(!Game_) return;
       if(e.touches.length>0){var t=e.touches[0],r=canvas.getBoundingClientRect(),tx=t.clientX-r.left,ty=t.clientY-r.top;self.touchStart={x0:tx,y0:ty,lastX:tx,lastY:ty,moved:false,t0:performance.now()};self.pinchDist=0;return;}
+            if(self.touchStart && self.touchStart.boxSelect){
+        var b = self.touchStart.boxSelect;
+        if(Math.abs(b.x2-b.x1)>15 || Math.abs(b.y2-b.y1)>15){
+          Game_.handleBoxSelect(b, false);
+        }
+        self.touchStart = null;
+        self._ignoreMouseUntil = performance.now() + 500;
+        return;
+      }
       if(self.touchStart&&!self.touchStart.moved){
         var tt=self.touchStart;
         var dur=(performance.now()-(tt.t0||0));
