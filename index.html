@@ -6389,7 +6389,7 @@ function Unit(x,y,team,def,race){
   this.attackMoveTo=null;this.patrolRoute=null;this.patrolIdx=0;
   this._path=null;this._pathIdx=0;
   this._lastMoveTo=null;this._lastAttackMoveTo=null;
-  this.walkOffset=Math.random()*6.28;this._visFade=1;
+  this.walkOffset=Math.random()*6.28;this._visFade=0;
   this._handScreenX=null;this._handScreenY=null;
   this._insideMine=false;
   this._mineSlot=-1;
@@ -6439,7 +6439,7 @@ function Building(x,y,team,def,race){
   this.size=def.size||3;this.radius=this.size*22;this.pop=def.pop||0;this.atk=def.atk||0;this.rng=def.rng||0;this.atkCdBase=def.atkCd||1.5;
   this.completed=true;this.buildProgress=def.time;this.queue=[];this.reviveQueue=[];this.level=1;this.atkCd=0;
   this.dead=false;this.sel=false;this.hitFlash=0;this.owner='bot';this.pid=0;this.isUnit=false;this.isBuilding=true;this.isCreep=false;
-  this.upgrading=false;this.upgradeTimeLeft=0;this.pulse=0;this.dying=false;this._visFade=1;
+  this.upgrading=false;this.upgradeTimeLeft=0;this.pulse=0;this.dying=false;this._visFade=0;
   this.aiId=0;
   this.techUpgrading=null;
   this.lastAttacker=null;
@@ -6479,7 +6479,7 @@ function Creep(x,y,kind,level,forceBoss){
   this.bounty=this.isBoss?BOUNTY_BOSS:0;
   this.dir=DIR.DOWN;this.moving=false;this.walkPhase=Math.random()*6.28;this.target=null;this.moveTo=null;this.atkCd=0;this.hitFlash=0;this.animT=Math.random()*10;
   this.homeX=x;this.homeY=y;this.wanderT=0;this.wanderTarget=null;this.attackT=0;this.lastAttacker=null;this.sel=false;this.stunT=0;
-  this._visFade=1;
+  this._visFade=0;
   this.leashR=620;
   this.aggroR=260;
   this.bleedT=0;this.bleedDmg=0;
@@ -7371,16 +7371,26 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
     if(u.hp<=0){u.dying=true;u.deathT=0;u.deathDir=1;}
     if(u.dying){u.deathT+=dt;if(u.deathT>1.6)u.dead=true;return;}
     u._healTimer=(u._healTimer||0)-dt;
-    if(u._healTimer<=0){
-      u._healTimer=1;
-      for(var _thi=0;_thi<this.units.length;_thi++){
-        // ... логика лечения ...
-      }
-      for(var _tpi=0;_tpi<10;_tpi++){
-        var _tpa=Math.random()*TAU,_tpr=40+Math.random()*200;
-        this.particles.spawn(u.x+Math.cos(_tpa)*_tpr,u.y+Math.sin(_tpa)*_tpr,-Math.cos(_tpa)*30,-Math.sin(_tpa)*30-20,1.0,'#80ff60',2.5);
-      }
-    }
+if(u._healTimer<=0){
+  u._healTimer=1;
+  var _hR=u._healRadius||250;
+  var _hAmt=u._healAmt||10;
+  for(var _thi=0;_thi<this.units.length;_thi++){
+    var _tu=this.units[_thi];
+    if(!_tu||_tu===u||_tu.dying||_tu.dead) continue;
+    if(_tu.team!==u.team) continue;
+    if(Math.hypot(_tu.x-u.x,_tu.y-u.y)>_hR) continue;
+    if(_tu.hp>=_tu.maxHp) continue;
+    var _healed=Math.min(_hAmt,_tu.maxHp-_tu.hp);
+    if(_healed<=0) continue;
+    _tu.hp+=_healed;
+    this.floaters.push(new Floater(_tu.x,_tu.y-30,'+'+Math.round(_healed),'#80ff60'));
+  }
+  for(var _tpi=0;_tpi<10;_tpi++){
+    var _tpa=Math.random()*TAU,_tpr=40+Math.random()*_hR*0.8;
+    this.particles.spawn(u.x+Math.cos(_tpa)*_tpr,u.y+Math.sin(_tpa)*_tpr,-Math.cos(_tpa)*30,-Math.sin(_tpa)*30-20,1.0,'#80ff60',2.5);
+  }
+}
                 u.moving=false;
             return;
           }
@@ -10925,18 +10935,20 @@ AIController.prototype.tryBuild=function(){
       }
       // 2. Если свободных нет — СИЛОЙ снимаем любого рабочего с добычи
       if(!_twW){
-        for(var _twI=0;_twI<g.units.length;_twI++){ 
-          var _twU=g.units[_twI]; 
-          if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying){ 
-            _twW=_twU; 
-            _twW.gatherTarget=null; 
-            _twW._assignedMine=null;
-            _twW.carrying=null; _twW.carryAmt=0; // ВОТ ЭТОГО НЕ ХВАТАЛО
-            _twW.moveTo=null; _twW._path=null;   // ВОТ ЭТОГО НЕ ХВАТАЛО
-            break; 
-          } 
-        }
-      }
+      if(!_twW){
+  for(var _twI=0;_twI<g.units.length;_twI++){
+    var _twU=g.units[_twI];
+    if(_twU.pid===this.pid && _twU.role==='worker' && !_twU.dying){
+      _twW=_twU;
+      _twW.gatherTarget=null;
+      _twW._assignedMine=null;
+      _twW.carrying=null; _twW.carryAmt=0;
+      _twW.moveTo=null; _twW._path=null;
+      _twW._insideMine=false; _twW._mineSlot=-1; _twW._waitingForMine=false;
+      break;
+    }
+  }
+}
       if(_twW && th){
         // Ищем врага, который атакует, чтобы поставить башню в его сторону
         var _threat = null;
@@ -11030,18 +11042,19 @@ for(var oi=0;oi<order.length;oi++){
   }
   // 2. Если нет — забираем с добычи (строительство важнее)
   if(!w){
-    for(var k2=0;k2<g.units.length;k2++){
-      var u=g.units[k2];
-      if(u.pid===this.pid && u.role==='worker' && !u.dying){
-        w=u;
-        w.gatherTarget=null; 
-        w._assignedMine=null;
-        w.carrying=null; w.carryAmt=0; // Выбрасываем ресурсы
-        w.moveTo=null; w._path=null;   // Сбрасываем маршрут
-        break;
-      }
+  for(var k2=0;k2<g.units.length;k2++){
+    var u=g.units[k2];
+    if(u.pid===this.pid && u.role==='worker' && !u.dying){
+      w=u;
+      w.gatherTarget=null;
+      w._assignedMine=null;
+      w.carrying=null; w.carryAmt=0;
+      w.moveTo=null; w._path=null;
+      w._insideMine=false; w._mineSlot=-1; w._waitingForMine=false;
+      break;
     }
   }
+}
   if(!w) return;
   for(var a=0;a<24;a++){
     var _nearestMine=null,_nmD=Infinity;
@@ -12201,17 +12214,18 @@ AIController.prototype.healAlliesOutOfCombat=function(){
   }
   // 2. Если нет — забираем с добычи (вторая база — критически важна)
   if(!w){
-    for(var k=0;k<g.units.length;k++){
-      var u=g.units[k];
-      if(u.pid===this.pid && u.role==='worker' && !u.dying){
-        w=u;
-        w.gatherTarget=null; w._assignedMine=null;
-        w.carrying=null; w.carryAmt=0; // Выбрасываем ресурсы
-        w.moveTo=null; w._path=null;   // Сбрасываем старый маршрут
-        break;
-      }
+  for(var k=0;k<g.units.length;k++){
+    var u=g.units[k];
+    if(u.pid===this.pid && u.role==='worker' && !u.dying){
+      w=u;
+      w.gatherTarget=null; w._assignedMine=null;
+      w.carrying=null; w.carryAmt=0;
+      w.moveTo=null; w._path=null;
+      w._insideMine=false; w._mineSlot=-1; w._waitingForMine=false;
+      break;
     }
   }
+}
   if(!w) return;
   for(var ob=0;ob<g.buildings.length;ob++){var bb=g.buildings[ob];var dx=bb.x-tx,dy=bb.y-ty,rr=bb.radius+180;if(dx*dx+dy*dy<rr*rr) return;}
   g.buildings.push(nb);g.navDirty=true;
