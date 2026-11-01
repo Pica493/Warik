@@ -1722,8 +1722,10 @@ function drawInquisitorSide(ctx,W,H,team,atk,cast){
       ctx.beginPath();ctx.arc(cx-10+_bi*4,bodyBaseY-bh+22,1,0,TAU);ctx.fill();
       ctx.strokeStyle='#3a2010';ctx.lineWidth=0.4;ctx.stroke();
     }
-    /* ==== посох ==== */
-    var staffX=cx+14,staffTop=bodyBaseY-bh-22,staffBot=baseY-4;
+        /* ==== посох ==== */
+    var _staffLift=cast*8+atk*3;
+    var _staffThrust=atk*10;
+    var staffX=cx+14+_staffThrust,staffTop=bodyBaseY-bh-22-_staffLift,staffBot=baseY-4;
     var cryY=staffTop+2;
     var bgGlow=ctx.createRadialGradient(staffX,cryY,2,staffX,cryY,14);
     bgGlow.addColorStop(0,'rgba(255,180,80,0.5)');
@@ -1858,9 +1860,11 @@ function drawInquisitorSide(ctx,W,H,team,atk,cast){
   ctx.stroke();
 }
 else if(heroType==='shaman'){
+    var _staffLift=cast*8+atk*3;
+  var _staffThrust=atk*12;
   var _shHeadY = bodyBaseY-bh-14;
   var _shRobeH = bh+13;
-  var _shStaffTop = bodyBaseY-bh-28;
+  var _shStaffTop = bodyBaseY-bh-28-_staffLift;
   var _shStaffBot = baseY-6;
   var _shSkullY = _shStaffTop+4;
 
@@ -1907,7 +1911,7 @@ else if(heroType==='shaman'){
     ctx.beginPath();ctx.moveTo(cx+3,_shHeadY+6);ctx.lineTo(cx+2.5,_shHeadY+9);ctx.lineTo(cx+1.5,_shHeadY+6);ctx.closePath();ctx.fill();
   }
 
-  var _staffX = isBack ? cx-16 : cx+16;
+    var _staffX = isBack ? (cx-16-_staffThrust) : (cx+16+_staffThrust);
   ctx.strokeStyle='#3a2010';ctx.lineWidth=2.6;
   ctx.beginPath();ctx.moveTo(_staffX,_shStaffTop);ctx.lineTo(_staffX,_shStaffBot);ctx.stroke();
   ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;
@@ -2003,35 +2007,66 @@ else if(heroType==='hunter'){
     ctx.strokeStyle='#0a2a08';ctx.lineWidth=1.2;ctx.stroke();
   }
 
-            ctx.strokeStyle='#c8a050';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.arc(cx,headY-1,headR+3,Math.PI*0.95,Math.PI*2.05,false);ctx.stroke();
+                /* ==== лук и руки: сдвиг по atk + натяжение тетивы ==== */
+    var _bowPull=atk*7;             // насколько тянется тетива назад
+    var _bowShiftX=atk*4;           // насколько весь лук уходит вперёд
+    var _bowCX=cx+22+_bowShiftX;    // центр лука
+    var _bowCY=bodyBaseY-bh+18;     // центр лука по Y
+    var _bowR=13;
+    var _handBowX=cx+17+_bowShiftX; // правая кисть на луке
+    var _handBowY=bodyBaseY-bh+20;
+    var _handPullX=_bowCX-_bowPull; // левая кисть на тетиве (тянется влево)
+    var _handPullY=_bowCY;
+
+    /* правая рука — держит лук */
     ctx.strokeStyle='#c8dcb8';ctx.lineWidth=3;ctx.lineCap='round';
-    ctx.beginPath();ctx.moveTo(cx+8,bodyBaseY-bh+8);ctx.lineTo(cx+15,bodyBaseY-bh+14);ctx.lineTo(cx+17,bodyBaseY-bh+20);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+8,bodyBaseY-bh+8);ctx.lineTo(cx+15,bodyBaseY-bh+14);ctx.lineTo(_handBowX,_handBowY);ctx.stroke();
     ctx.strokeStyle='#8aaa70';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx+8,bodyBaseY-bh+8);ctx.lineTo(cx+15,bodyBaseY-bh+14);ctx.lineTo(cx+17,bodyBaseY-bh+20);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+8,bodyBaseY-bh+8);ctx.lineTo(cx+15,bodyBaseY-bh+14);ctx.lineTo(_handBowX,_handBowY);ctx.stroke();
     ctx.fillStyle=skinPal.skin;
-    ctx.beginPath();ctx.arc(cx+17,bodyBaseY-bh+20,2.4,0,TAU);ctx.fill();
+    ctx.beginPath();ctx.arc(_handBowX,_handBowY,2.4,0,TAU);ctx.fill();
     ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
+
+    /* сама дуга лука */
     ctx.strokeStyle='#5a3a15';ctx.lineWidth=2.6;
-    ctx.beginPath();ctx.arc(cx+22,bodyBaseY-bh+18,13,-Math.PI*0.75,Math.PI*0.75);ctx.stroke();
+    ctx.beginPath();ctx.arc(_bowCX,_bowCY,_bowR,-Math.PI*0.75,Math.PI*0.75);ctx.stroke();
     ctx.strokeStyle='#2a1508';ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(cx+22,bodyBaseY-bh+18,13,-Math.PI*0.75,Math.PI*0.75);ctx.stroke();
+    ctx.beginPath();ctx.arc(_bowCX,_bowCY,_bowR,-Math.PI*0.75,Math.PI*0.75);ctx.stroke();
+
+    /* тетива: три точки — верх, «натянутый» центр, низ */
+    var _bowTopX=_bowCX+_bowR*Math.cos(-Math.PI*0.75);
+    var _bowTopY=_bowCY+_bowR*Math.sin(-Math.PI*0.75);
+    var _bowBotX=_bowCX+_bowR*Math.cos(Math.PI*0.75);
+    var _bowBotY=_bowCY+_bowR*Math.sin(Math.PI*0.75);
     ctx.strokeStyle='#e0d8c0';ctx.lineWidth=0.7;
     ctx.beginPath();
-    ctx.moveTo(cx+22+13*Math.cos(-Math.PI*0.75),bodyBaseY-bh+18+13*Math.sin(-Math.PI*0.75));
-    ctx.lineTo(cx+22+13*Math.cos(Math.PI*0.75),bodyBaseY-bh+18+13*Math.sin(Math.PI*0.75));
+    ctx.moveTo(_bowTopX,_bowTopY);
+    ctx.lineTo(_handPullX,_handPullY);
+    ctx.lineTo(_bowBotX,_bowBotY);
     ctx.stroke();
+
+    /* левая рука — тянет тетиву */
     ctx.strokeStyle='#c8dcb8';ctx.lineWidth=3;ctx.lineCap='round';
-    ctx.beginPath();ctx.moveTo(cx-8,bodyBaseY-bh+8);ctx.lineTo(cx+2,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+18);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-8,bodyBaseY-bh+8);ctx.lineTo(cx+2,bodyBaseY-bh+16);ctx.lineTo(_handPullX,_handPullY);ctx.stroke();
     ctx.strokeStyle='#8aaa70';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx-8,bodyBaseY-bh+8);ctx.lineTo(cx+2,bodyBaseY-bh+16);ctx.lineTo(cx+12,bodyBaseY-bh+18);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-8,bodyBaseY-bh+8);ctx.lineTo(cx+2,bodyBaseY-bh+16);ctx.lineTo(_handPullX,_handPullY);ctx.stroke();
     ctx.fillStyle=skinPal.skin;
-    ctx.beginPath();ctx.arc(cx+12,bodyBaseY-bh+18,2.4,0,TAU);ctx.fill();
+    ctx.beginPath();ctx.arc(_handPullX,_handPullY,2.4,0,TAU);ctx.fill();
     ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
-    ctx.strokeStyle='#8a6a3a';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx+12,bodyBaseY-bh+18);ctx.lineTo(cx+27,bodyBaseY-bh+18);ctx.stroke();
-    ctx.fillStyle='#c8c8c8';
-    ctx.beginPath();ctx.moveTo(cx+30,bodyBaseY-bh+18);ctx.lineTo(cx+26,bodyBaseY-bh+16);ctx.lineTo(cx+26,bodyBaseY-bh+20);ctx.closePath();ctx.fill();
+
+    /* стрела: видна, пока не «вылетела» (atk < 0.5) */
+    if(atk<0.5){
+      var _arrowTipX=_bowCX+8;
+      var _arrowTipY=_bowCY;
+      ctx.strokeStyle='#8a6a3a';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(_handPullX,_handPullY);ctx.lineTo(_arrowTipX,_arrowTipY);ctx.stroke();
+      ctx.fillStyle='#c8c8c8';
+      ctx.beginPath();
+      ctx.moveTo(_arrowTipX+3,_arrowTipY);
+      ctx.lineTo(_arrowTipX-1,_arrowTipY-2);
+      ctx.lineTo(_arrowTipX-1,_arrowTipY+2);
+      ctx.closePath();ctx.fill();
+    }
     ctx.lineCap='butt';
   }
 }
