@@ -8387,7 +8387,6 @@ Game.prototype.doMove=function(u,dt){
         }
         if(_escBest){u.x=this.clampX(_escBest.x);u.y=this.clampY(_escBest.y);}
       }
-      }
     } else u._stuckTimer=0;
     if(Math.abs(dxT)>Math.abs(dyT)) u.dir=dxT>=0?DIR.RIGHT:DIR.LEFT;else u.dir=dyT>=0?DIR.DOWN:DIR.UP;
     u.moving=true;
