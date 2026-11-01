@@ -1013,7 +1013,8 @@ var legDef=getLeg(role),legH=legDef?legDef.h:14;
 var bodyBaseY=H-legH;
 var bw,bh,headY;
 if(role==='worker'){bw=16;bh=20;headY=bodyBaseY-bh-6;}
-else if(role==='hero'){bw=(race==='luminite')?9:22;bh=27;headY=bodyBaseY-bh-10;}
+// ПАТЧ #13: для всех героев одинаково широкое тело — руки крепятся к телу, а не «в воздухе»
+else if(role==='hero'){bw=18;bh=27;headY=bodyBaseY-bh-10;}
 else if(role==='elite'){bw=18;bh=22;headY=bodyBaseY-bh-8;}
 else if(role==='spear'){bw=16;bh=24;headY=bodyBaseY-bh-7;}
 else if(role==='ranged'){bw=17;bh=21;headY=bodyBaseY-bh-6;}
@@ -1172,12 +1173,13 @@ if(race==='gromborn'&&!isBack && !isShaman){
       ctx.quadraticCurveTo(cx+18,bodyBaseY+6,cx+15,headY+6);
       ctx.closePath();ctx.fill();
       ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
+            // ПАТЧ #13: наплечники ближе к телу (не торчат)
       ctx.fillStyle='#e6c67a';
-      ctx.beginPath();ctx.ellipse(cx-bw/2-2,bodyBaseY-bh+3,5,3.5,0.2,0,TAU);ctx.fill();
-      ctx.beginPath();ctx.ellipse(cx+bw/2+2,bodyBaseY-bh+3,5,3.5,-0.2,0,TAU);ctx.fill();
+      ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.fill();
+      ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.fill();
       ctx.strokeStyle='#3a2010';ctx.lineWidth=1;
-      ctx.beginPath();ctx.ellipse(cx-bw/2-2,bodyBaseY-bh+3,5,3.5,0.2,0,TAU);ctx.stroke();
-      ctx.beginPath();ctx.ellipse(cx+bw/2+2,bodyBaseY-bh+3,5,3.5,-0.2,0,TAU);ctx.stroke();
+      ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.stroke();
+      ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.stroke();
     }
   } else if(race==='gromborn'){
     if(isShaman){
@@ -1403,7 +1405,8 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-4,baseY-17,5,17);
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.strokeRect(cx-4,baseY-17,5,17);
   ctx.fillStyle='#1a0a04';ctx.fillRect(cx-5,baseY-3,7,3);
-  var robeG=ctx.createLinearGradient(cx-13,bodyTopOf(baseY),cx+13,baseY);
+    // ПАТЧ #12: bodyTopOf не существует — используем baseY-44 (верх рясы)
+  var robeG=ctx.createLinearGradient(cx-13,baseY-44,cx+13,baseY);
   robeG.addColorStop(0,'#f4f0e4');robeG.addColorStop(0.5,'#d8d4c6');robeG.addColorStop(1,'#8a8478');
   ctx.fillStyle=robeG;
   ctx.beginPath();
@@ -6729,8 +6732,15 @@ Game.prototype.getBuildingHpBonus=function(pid){
   return upg?upg.hpBonus:0;
 };
 Game.prototype.countGatherers=function(res){
+  // ПАТЧ #11: не считаем тех кто в очереди ожидания
   var n=0;
-  for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.dying) continue;if(u.gatherTarget===res) n++;}
+  for(var i=0;i<this.units.length;i++){
+    var u=this.units[i];
+    if(u.dying) continue;
+    if(u.gatherTarget!==res) continue;
+    if(u._waitingForMine) continue;
+    n++;
+  }
   return n;
 };
 Game.prototype.clampX=function(x){return cl(x,20,this.W-20);};
@@ -7279,11 +7289,12 @@ Game.prototype._markAutoAcquire=function(u){
   this._mineCacheTimer-=dt;
   if(this._mineCacheTimer<=0){
     this._mineCacheTimer=0.3;
-    this._mineWorkerCache={};
+        this._mineWorkerCache={};
     for(var _mcI=0;_mcI<this.units.length;_mcI++){
       var _mcU=this.units[_mcI];
       if(_mcU.dying||_mcU.dead) continue;
-      if(_mcU.gatherTarget && _mcU.gatherTarget.kind==='gold'){
+      // ПАТЧ #11: считаем только тех кто РЕАЛЬНО внутри (макс = MAX_GATHER_PER_MINE)
+      if(_mcU._insideMine && _mcU.gatherTarget && _mcU.gatherTarget.kind==='gold'){
         var _mcId=_mcU.gatherTarget.id;
         this._mineWorkerCache[_mcId]=(this._mineWorkerCache[_mcId]||0)+1;
       }
@@ -8691,18 +8702,10 @@ Game.prototype.doGather=function(u,dt){
     if(u.carrying) this.returnRes(u,dt);
     return;
   }
+    // ПАТЧ #11: если каким-то образом попал в _waitingForMine — сбрасываем и ищем заново
   if(u._waitingForMine){
-    var usedW={};
-    for(var mw=0;mw<this.units.length;mw++){
-      var muw=this.units[mw];
-      if(muw===u||muw.dead||muw.dying) continue;
-      if(muw.gatherTarget!==g) continue;
-      if(muw._mineSlot>=0&&muw._mineSlot<MAX_GATHER_PER_MINE) usedW[muw._mineSlot]=true;
-    }
-    var freeW=-1;
-    for(var sw=0;sw<MAX_GATHER_PER_MINE;sw++){if(!usedW[sw]){freeW=sw;break;}}
-    if(freeW>=0){u._waitingForMine=false;u._mineSlot=freeW;u.gatherProgress=0;}
-    else return;
+    u._waitingForMine=false;
+    u._mineSlot=-1;
   }
   if(u.carrying&&u.carryAmt>=10){u._insideMine=false;u._mineSlot=-1;u._waitingForMine=false;this.returnRes(u,dt);return;}
   var dx=g.x-u.x,dy=g.y-u.y,d=Math.hypot(dx,dy),reach=g.radius+30;
@@ -8746,15 +8749,23 @@ Game.prototype.doGather=function(u,dt){
         }
         var freeSlot=-1;
         for(var s=0;s<MAX_GATHER_PER_MINE;s++){ if(!used[s]){freeSlot=s;break;} }
-        if(freeSlot<0){
-          u._mineSlot=-1;
-          u._insideMine=false;u._waitingForMine=true;u._stuckTimer=0;u._stuckCheckTimer=0;u.moving=false;
-          var waitAng=(u.id*0.71)%TAU;
-          u.x=g.x+Math.cos(waitAng)*78;
-          u.y=g.y+Math.sin(waitAng)*78;
-          u.gatherProgress=0;u.chopT=0;
-          return;
+              if(_slotFree<0){
+        // ПАТЧ #11: не ждём — ищем другую шахту или отменяем
+        u._mineSlot=-1;
+        u._insideMine=false;u._waitingForMine=false;u._stuckTimer=0;u._stuckCheckTimer=0;u.moving=false;
+        u.gatherProgress=0;u.chopT=0;
+        var _altMine=null;
+        for(var _amI=0;_amI<this.resources.length;_amI++){
+          var _am=this.resources[_amI];
+          if(_am.kind!=='gold'||_am.dead||_am===g||_am.amount<500) continue;
+          if(!this.isVisibleForTeam(u.team,_am.x,_am.y)) continue;
+          if(this.countGatherers(_am)>=MAX_GATHER_PER_MINE) continue;
+          _altMine=_am;break;
         }
+        if(_altMine){u.gatherTarget=_altMine;u._assignedMine=_altMine;}
+        else{u.gatherTarget=null;u._assignedMine=null;}
+        return;
+      }
         u._mineSlot=freeSlot;
       }
       var usedNow={};
@@ -14330,7 +14341,8 @@ UISys.prototype.refreshSelection=function(){
         else if(_wu._waitingForMine) waiting++;
       }
     }
-    info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+inside+'/'+MAX_GATHER_PER_MINE+' | Ждут: '+waiting;
+        // ПАТЧ #11: убрали "Ждут" — рабочие больше не ждут снаружи
+    info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+inside+'/'+MAX_GATHER_PER_MINE;
     this.$('cmdpanel').classList.add('show');
     this.drawMinePortrait(rr,workersList);
     var box=this.$('actions');box.innerHTML='';box.dataset.menu='';
@@ -14388,7 +14400,7 @@ UISys.prototype.refreshInfoOnly=function(){
     var info=this.$('selinfo');
     if(info){
       info.classList.add('show');
-      info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+_inCnt+'/'+MAX_GATHER_PER_MINE+' | Ждут: '+_waitCnt;
+            info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+_inCnt+'/'+MAX_GATHER_PER_MINE;
     }
     // ПАТЧ #1: обновлять полосу ресурса в портрете
     var pInfo=this.$('portrait-info');
@@ -14667,18 +14679,34 @@ UISys.prototype.cycleActiveUnit=function(dir){
         var tuInfoB=TOWER_UPGRADES[ent.race]&&TOWER_UPGRADES[ent.race][ent.towerUpgrade];
         towerUpTag=' <span style="color:#a0c0ff;font-size:9px">('+(tuInfoB?(LC==='en'?tuInfoB.nameEn:tuInfoB.name):'')+')</span>';
       }
+            // ПАТЧ #10: иконки в панели здания (как в тултипах)
+      var _mkInlB=function(k){return ' <img src="'+toolIconURL(k,11)+'" style="width:11px;height:11px;vertical-align:-2px;display:inline-block">';};
       var htmlB='<div class="pname">'+bldName(ent.race,ent.kind)+towerUpTag+ownerTag2+'</div>';
       htmlB+='<div class="pbar"><div class="fill" style="width:'+hpPctB+'%;background:'+hpColB+'"></div><div class="lbl">HP '+Math.ceil(ent.hp)+'/'+ent.maxHp+'</div></div>';
       if(!ent.completed){
         var bpPct=Math.max(0,Math.min(100,Math.round(ent.buildProgress/ent.buildTime*100)));
         htmlB+='<div class="pbar"><div class="fill" style="width:'+bpPct+'%;background:linear-gradient(90deg,#8a6a1a,#e6c67a)"></div><div class="lbl">Стройка '+bpPct+'%</div></div>';
       } else if(ent.atk){
-        htmlB+='<div class="prow"><span>Урон:</span><span class="v">'+ent.atk+'</span></div>';
-        htmlB+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.rng+'</span></div>';
+        htmlB+='<div class="prow"><span>Урон:</span><span class="v">'+ent.atk+_mkInlB('weapon_melee')+'</span></div>';
+        htmlB+='<div class="prow"><span>Дальность:</span><span class="v">'+ent.rng+_mkInlB('range')+'</span></div>';
+        if(ent.atkCdBase) htmlB+='<div class="prow"><span>Атака:</span><span class="v">'+ent.atkCdBase.toFixed(2)+'с'+_mkInlB('time')+'</span></div>';
       } else if(ent.pop){
-        htmlB+='<div class="prow"><span>Еда:</span><span class="v">+'+ent.pop+'</span></div>';
+        htmlB+='<div class="prow"><span>Еда:</span><span class="v">+'+ent.pop+_mkInlB('meat')+'</span></div>';
       }
-      if(ent.level>1) htmlB+='<div class="prow"><span>Уровень:</span><span class="v">'+ent.level+'</span></div>';
+      if(ent.level>1) htmlB+='<div class="prow"><span>Уровень:</span><span class="v">'+ent.level+_mkInlB('upgrade')+'</span></div>';
+      if(ent.kind==='townhall'&&ent.upgrading){
+        var _upPr=Math.max(0,Math.min(1,1-ent.upgradeTimeLeft/(TH_UPG[ent.level]||{time:1}).time));
+        htmlB+='<div class="prow"><span>Улучшение:</span><span class="v">'+Math.round(_upPr*100)+'%'+_mkInlB('upgrade')+'</span></div>';
+      }
+      if(ent.kind==='lumber'&&(ent.sawmillLevel||0)>0){
+        htmlB+='<div class="prow"><span>Лесопилка:</span><span class="v">ур.'+ent.sawmillLevel+' '+_mkInlB('upgrade')+'</span></div>';
+      }
+      if(ent.kind==='tower'&&ent.towerUpgrade){
+        var _tuInfo=TOWER_UPGRADES[ent.race]&&TOWER_UPGRADES[ent.race][ent.towerUpgrade];
+        if(_tuInfo){
+          htmlB+='<div class="prow"><span>Улучшение:</span><span class="v" style="color:#a0c0ff">'+(LC==='en'?_tuInfo.nameEn:_tuInfo.name)+_mkInlB('upgrade')+'</span></div>';
+        }
+      }
       info.innerHTML=htmlB;
     }
   }catch(e){ERR('drawPortrait',e);}
