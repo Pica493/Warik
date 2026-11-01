@@ -976,17 +976,24 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.closePath();
 }
 
-          function bakeUnit(race,role,team,dir,frame,heroType){
+          function bakeUnit(race,role,team,dir,frame,heroType,atk,chop,cast){
 frame=frame||0;
 heroType=heroType||'';
+atk=atk||0;chop=chop||0;cast=cast||0;
 var isMounted=(role==='cav');
 var key='u_'+race+'_'+role+'_'+team+'_'+dir+((heroType)?('_'+heroType):'')+((role==='fly'||isMounted||(role==='siege'&&race==='sylvanid'))?('_f'+(frame|0)):'');
 if(SPRITES[key]) return SPRITES[key];
 var isHero=role==='hero';
 if(isHero&&heroType&&(heroType==='inquisitor'||heroType==='shaman'||heroType==='hunter')){
+  var _aIdx=0;
+  if(atk>0.15) _aIdx+=Math.min(7,Math.floor(atk*8));
+  if(cast>0.15) _aIdx+=Math.min(7,Math.floor(cast*8))*8;
+  var _animKey=_aIdx>0?('_a'+_aIdx):'';
+  var _fullKey=key+_animKey;
+  if(SPRITES[_fullKey]) return SPRITES[_fullKey];
   var W2=72,H2=92,cv2=makeCv(W2,H2),ctx2=cv2.getContext('2d');
-  drawVariantHero(ctx2,W2,H2,race,heroType,team,dir,frame);
-  SPRITES[key]=cv2;return cv2;
+  drawVariantHero(ctx2,W2,H2,race,heroType,team,dir,frame,atk,chop,cast);
+  SPRITES[_fullKey]=cv2;return cv2;
 }
 var W=role==='cav'?100:role==='siege'?100:role==='fly'?(race==='gromborn'?120:90):(isHero?70:56);
 var H=role==='cav'?126:role==='siege'?100:role==='fly'?(race==='gromborn'?100:84):(isHero?90:74);
@@ -1399,7 +1406,8 @@ if(race==='gromborn'&&!isBack && !isShaman){
 }
 
 
-function drawInquisitorSide(ctx,W,H,team){
+function drawInquisitorSide(ctx,W,H,team,atk,cast){
+  atk=atk||0;cast=cast||0;
   var color=teamColor(team),cx=W/2,baseY=86;
   var skinPal=RACE_SKIN.luminite;
   ctx.fillStyle='rgba(0,0,0,0.35)';
@@ -1462,7 +1470,9 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.quadraticCurveTo(cx-9,baseY-72,cx+1,baseY-72);
   ctx.quadraticCurveTo(cx+7,baseY-71,cx+7,baseY-62);
   ctx.stroke();
-  var staffX=cx+18,staffTop=baseY-70,staffBot=baseY-2;
+    var _staffLift=cast*8+atk*3;
+  var _staffThrust=atk*10;
+  var staffX=cx+18+_staffThrust,staffTop=baseY-70-_staffLift,staffBot=baseY-2;
   var sG=ctx.createLinearGradient(staffX-1.5,staffTop,staffX+1.5,staffBot);
   sG.addColorStop(0,'#5a3a18');sG.addColorStop(0.5,'#3a2010');sG.addColorStop(1,'#1a0a04');
   ctx.fillStyle=sG;ctx.fillRect(staffX-1.5,staffTop,3,staffBot-staffTop);
@@ -1495,7 +1505,8 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
 }
 
-      function drawShamanSide(ctx,W,H,team){
+      function drawShamanSide(ctx,W,H,team,atk,cast){
+  atk=atk||0;cast=cast||0;
   var cx=W/2,baseY=86;
   var skinPal=RACE_SKIN.gromborn;
   ctx.fillStyle='rgba(0,0,0,0.35)';
@@ -1532,7 +1543,9 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.fillStyle='#1a0808';
   ctx.beginPath();ctx.arc(cx,headCY,headR+3,Math.PI,TAU,false);ctx.closePath();ctx.fill();
   ctx.strokeStyle='#0a0404';ctx.lineWidth=1.2;ctx.stroke();
-  var staffX=cx+18,staffTop=baseY-72,staffBot=baseY-2;
+    var _staffLift=cast*8+atk*3;
+  var _staffThrust=atk*12;
+  var staffX=cx+18+_staffThrust,staffTop=baseY-72-_staffLift,staffBot=baseY-2;
   ctx.strokeStyle='#3a2010';ctx.lineWidth=2.6;
   ctx.beginPath();ctx.moveTo(staffX,staffTop);ctx.lineTo(staffX,staffBot);ctx.stroke();
   ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;
@@ -1547,7 +1560,8 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.beginPath();ctx.moveTo(staffX+4,skY-4);ctx.lineTo(staffX+6,skY-8);ctx.stroke();
 }
 
-      function drawHunterSide(ctx,W,H,team){
+      function drawHunterSide(ctx,W,H,team,atk){
+  atk=atk||0;
   var color=teamColor(team),cx=W/2,baseY=86;
   var skinPal=RACE_SKIN.sylvanid;
   ctx.fillStyle='rgba(0,0,0,0.35)';
@@ -1619,13 +1633,14 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.fillStyle='#5adf5a';
   ctx.beginPath();ctx.ellipse(cx-6,headCY-headR-2,2.6,1.5,-0.4,0,TAU);ctx.fill();ctx.strokeStyle='#0a2a08';ctx.lineWidth=0.5;ctx.stroke();
   ctx.beginPath();ctx.ellipse(cx+4,headCY-headR-5,2.4,1.4,0.6,0,TAU);ctx.fill();ctx.stroke();
-  var bowX=cx+8,bowY=baseY-34;
+    var _bowPull=atk*6;
+  var bowX=cx+8+atk*4,bowY=baseY-34;
   ctx.strokeStyle='#5a3a15';ctx.lineWidth=2.6;ctx.lineCap='round';
   ctx.beginPath();ctx.arc(bowX+2,bowY,15,-Math.PI*0.65,Math.PI*0.65);ctx.stroke();
   ctx.strokeStyle='#2a1508';ctx.lineWidth=0.9;
   ctx.beginPath();ctx.arc(bowX+2,bowY,15,-Math.PI*0.65,Math.PI*0.65);ctx.stroke();
   ctx.lineCap='butt';
-  var drawX=bowX-8;
+    var drawX=bowX-8-_bowPull;
   ctx.strokeStyle='#e0d8c0';ctx.lineWidth=0.9;
   ctx.beginPath();
   ctx.moveTo(bowX+2+15*Math.cos(-Math.PI*0.65),bowY+15*Math.sin(-Math.PI*0.65));
@@ -1658,7 +1673,8 @@ function drawInquisitorSide(ctx,W,H,team){
   ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
 }
 
-      function drawVariantHero(ctx,W,H,race,heroType,team,dir,frame){
+      function drawVariantHero(ctx,W,H,race,heroType,team,dir,frame,atk,chop,cast){
+  atk=atk||0;chop=chop||0;cast=cast||0;
   var isBack=(dir===DIR.UP);
   var color=teamColor(team),dark=teamDark(team);
   var cx=W/2,baseY=H-6;
@@ -1669,13 +1685,13 @@ function drawInquisitorSide(ctx,W,H,team){
   var headR=9;
   /* П13: профиль для LEFT/RIGHT */
   if(heroType==='inquisitor'&&(dir===DIR.LEFT||dir===DIR.RIGHT)){
-    drawInquisitorSide(ctx,W,H,team);return;
+    drawInquisitorSide(ctx,W,H,team,atk,cast);return;
   }
   if(heroType==='shaman'&&(dir===DIR.LEFT||dir===DIR.RIGHT)){
-    drawShamanSide(ctx,W,H,team);return;
+    drawShamanSide(ctx,W,H,team,atk,cast);return;
   }
   if(heroType==='hunter'&&(dir===DIR.LEFT||dir===DIR.RIGHT)){
-    drawHunterSide(ctx,W,H,team);return;
+    drawHunterSide(ctx,W,H,team,atk);return;
   }
   ctx.fillStyle='rgba(0,0,0,0.35)';
   ctx.beginPath();ctx.ellipse(cx,baseY+3,18,5,0,0,TAU);ctx.fill();
@@ -5196,7 +5212,7 @@ function drawUnitIntoCanvas(cv,race,role,team,dir,scaleFit,heroType){
     var hand=Renderer_._armsCtx(ctx,tempU,pObj,s,false,1);
     if(hand){
       ctx.save();ctx.translate(hand.x,hand.y);
-      Renderer_._mainW(ctx,role,race,0,0,0,s);
+            Renderer_._mainW(ctx,role,race,0,0,0,s,0);
       ctx.restore();
     }
   }
@@ -5260,7 +5276,7 @@ function getUnitIconURL(race,role,heroType){
     var hand=Renderer.prototype._armsCtx.call(null,ctx,tempU,pObj,s,false,1);
     if(hand){
       ctx.save();ctx.translate(hand.x,hand.y);
-      Renderer.prototype._mainW.call(null,ctx,role,race,0,0,0,s);
+            Renderer.prototype._mainW.call(null,ctx,role,race,0,0,0,s,0);
       ctx.restore();
     }
   }
@@ -6507,9 +6523,9 @@ function Unit(x,y,team,def,race){
   this._mineSlot=-1;
   this._waitingForMine=false;
   this._assignedMine=null;
-  this.lastAttacker=null;
+    this.lastAttacker=null;
   this.bounty=this.isHero?BOUNTY_HERO:0;
-  this.retreating=false;
+  // this.retreating удалено — используется только _retreating
   this.wheelRot=0;
   this.slowT=0;this.slowMul=1;
   this.markedT=0;this.markedBonus=1;
@@ -7555,8 +7571,7 @@ if(u._healTimer<=0){
   if(u.slowT>0){u.slowT-=dt;if(u.slowT<=0){u.slowMul=1;u.slowStacks=0;}}
   if(u.markedT>0){u.markedT-=dt;if(u.markedT<=0){u.markedBonus=1;}}
   if(u.bleedT>0){u.bleedT-=dt;u.hp-=(u.bleedDmg||0)*dt;if(u.bleedT<=0){u.bleedDmg=0;u._poisonStacks=0;}}
-  if(u._retreating && u.hp/u.maxHp >= 0.7) u._retreating = false;
-  if(u.retreating && u.hp/u.maxHp >= 0.7) u.retreating = false;
+    if(u._retreating && u.hp/u.maxHp >= 0.7) u._retreating = false;
   if(!u.dying && u.hp<u.maxHp && u.stunT<=0){
     if(!u.target || u.target.dead){
       var regen=u.raceRegen||0;
@@ -7758,9 +7773,10 @@ if(u.role==='siege' && (u.moving || _wDisp2>0.5)){
   }
   u.moving=false;
   if(u.role==='worker'){
-        if(u.moveTo){
+               if(u.moveTo){
       u.gatherTarget=null;u.repairTarget=null;u.buildTarget=null;u.demolishTarget=null;
       u._insideMine=false;u._mineSlot=-1;u._waitingForMine=false;
+      u._assignedMine=null;
       this.doMove(u,dt);
       if(u.moving || ((u.x-u._prevX)*(u.x-u._prevX)+(u.y-u._prevY)*(u.y-u._prevY))>0.25) u.walkPhase+=dt*10;
       return;
@@ -8074,12 +8090,15 @@ Game.prototype.updateBuilding=function(b,dt){
       }
     }
   }}
-  if(b.queue.length>0){
+    if(b.queue.length>0){
     var q=b.queue[0];q.timeLeft-=dt;
     if(q.timeLeft<=0){
       var race=RACES[q.race]||RACES[b.race],def=race&&race.units[q.role];
       var _nonSummonCount=0;
-      for(var _nsi=0;_nsi<this.units.length;_nsi++) if(!this.units[_nsi]._isSummon) _nonSummonCount++;
+      for(var _nsi=0;_nsi<this.units.length;_nsi++){
+        var _nsu=this.units[_nsi];
+        if(!_nsu._isSummon && !_nsu.dying && _nsu.pid===b.pid) _nonSummonCount++;
+      }
       if(def && _nonSummonCount<300){
         var res=this.getRes(b.pid);
         var foodCost=FOOD_COST[q.role]||1;
@@ -8272,13 +8291,10 @@ Game.prototype.doMove=function(u,dt){
       u.atkCd=u.cdBase;u.attackT=1;this.performAttack(u,attacker);
     }
   }
-  if(u.role==='worker'){
+    if(u.role==='worker'){
     if(u._insideMine){u._insideMine=false;u._mineSlot=-1;}
     if(u._waitingForMine) u._waitingForMine=false;
-    if(u._assignedMine){
-      var dAm=Math.hypot(u._assignedMine.x-u.moveTo.x, u._assignedMine.y-u.moveTo.y);
-      if(dAm>60) u._assignedMine=null;
-    }
+    u._assignedMine=null;
   }
   if(!u.moveTo){ u._path=null; return; }
   if(u.moveTo && (!u._lastMoveTo || u._lastMoveTo.x!==u.moveTo.x || u._lastMoveTo.y!==u.moveTo.y)){
@@ -8336,9 +8352,6 @@ Game.prototype.doMove=function(u,dt){
         }
         if(_escBest){u.x=this.clampX(_escBest.x);u.y=this.clampY(_escBest.y);}
       }
-        if(!this._wouldHitBuilding(_enx,_eny,u.radius,null,false,-1)&&!this._wouldHitResource(_enx,_eny,u.radius,null)){
-          u.x=this.clampX(_enx);u.y=this.clampY(_eny);
-        }
       }
     } else u._stuckTimer=0;
     if(Math.abs(dxT)>Math.abs(dyT)) u.dir=dxT>=0?DIR.RIGHT:DIR.LEFT;else u.dir=dyT>=0?DIR.DOWN:DIR.UP;
@@ -8509,11 +8522,10 @@ Game.prototype.performAttack=function(a,t){
     else if(a.role==='heal') Audio.sfx('heal_cast',a.x,a.y);
     else if(a.race==='luminite') Audio.sfx('crossbow',a.x,a.y);
     else Audio.sfx('arrow',a.x,a.y);
-    if(a.isHero) t.lastAttacker=a;
+        if(a.isHero) t.lastAttacker=a;
     if(a.role==='heal') a.castT=1;
     return;
   }
-  if(a.role==='heal'){return;}
   if(a.role==='spear') Audio.sfx('spear_thrust',a.x,a.y);
   else Audio.sfx('sword',a.x,a.y);
   t.hp-=dmg;t.hitFlash=0.2;t.lastAttacker=a;
@@ -9757,7 +9769,7 @@ if(ab.type==='ultimate'){
 Game.prototype.hasSelectedCombat=function(){for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.sel&&u.pid===this.playerPid&&u.role!=='worker'&&!u.dying) return true;}return false;};
 Game.prototype.togglePause=function(){this.paused=!this.paused;UI.togglePause(this.paused);};
 Game.prototype._getUnitSpriteSize=function(u){
-  if(u.role==='cav') return {w:100,h:126,f:0.95};
+  if(u.role==='cav') return {w:100,h:126,f:1};
   if(u.role==='siege') return {w:100,h:100,f:1};
   if(u.role==='fly') return {w:(u.race==='gromborn'?120:90),h:(u.race==='gromborn'?100:84),f:1};
   if(u.isHero) return {w:70,h:90,f:0.9};
@@ -10565,7 +10577,8 @@ Renderer.prototype._arms=function(u,p,s,flipX){
   var hand=this._armsCtx(this.ctx,u,p,s,flipX,this.g.camera.zoom);
   if(hand){u._handScreenX=hand.x;u._handScreenY=hand.y;}
 };
-Renderer.prototype._mainW=function(ctx,role,race,atk,chop,cast,s){
+Renderer.prototype._mainW=function(ctx,role,race,atk,chop,cast,s,animRef){
+  animRef=animRef||0;
   ctx.save();ctx.scale(s,s);
   if(role==='worker'){
     var swing=-0.25-chop*0.9;ctx.rotate(swing);
@@ -10679,9 +10692,9 @@ Renderer.prototype._mainW=function(ctx,role,race,atk,chop,cast,s){
       ctx.strokeStyle='#1a0a04';ctx.strokeRect(-8,-2,4,4);
       ctx.restore();
     } else {
-      var pull=(atk>0.3&&atk<0.7)?((atk-0.3)/0.4)*8:(atk>=0.7?Math.max(0,(1-(atk-0.7)/0.3))*8:0);
+            var pull=(atk>0.3&&atk<0.7)?((atk-0.3)/0.4)*8:(atk>=0.7?Math.max(0,(1-(atk-0.7)/0.3))*8:0);
       var loadT=(atk<0.3)?(atk/0.3):1;
-      var wswing=Math.sin(performance.now()*0.006)*0.02;
+      var wswing=Math.sin(animRef*1.4)*0.02;
       ctx.save();ctx.translate(0,-2);ctx.rotate(wswing);
       ctx.strokeStyle='#5a3a15';ctx.lineWidth=3;ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(4,-16);ctx.quadraticCurveTo(18,0,4,16);ctx.stroke();
@@ -11320,12 +11333,12 @@ var r=220+Math.random()*230;
 };
 AIController.prototype.tryTrain=function(){
   var g=this.g,res=g.getRes(this.pid),reserved=g.getReservedPop(this.pid);
-  // Q11.22: лимит 290
-    // ПАТЧ J-25: считаем только живых (не dying/dead)
+  // Q11.22: лимит 290 (на игрока)
+    // ПАТЧ J-25: считаем только живых юнитов ЭТОГО бота
   var _nonSummon=0;
   for(var _nsi=0;_nsi<g.units.length;_nsi++){
     var _nsu=g.units[_nsi];
-    if(!_nsu._isSummon && !_nsu.dying && !_nsu.dead) _nonSummon++;
+    if(!_nsu._isSummon && !_nsu.dying && !_nsu.dead && _nsu.pid===this.pid) _nonSummon++;
   }
   if(_nonSummon>=290) return;
   var buildings=[];
@@ -12038,9 +12051,8 @@ AIController.prototype.heroRetreat=function(){
         var d=(b.x-h.x)*(b.x-h.x)+(b.y-h.y)*(b.y-h.y);
         if(d<bd){bd=d;th=b;}
       }
-            if(th){
-        h.retreating=true;
-        h._retreating=true;  // ПАТЧ J-24: рабочий флаг
+                  if(th){
+        h._retreating=true;  // единственный рабочий флаг
         h.moveTo={x:th.x+(Math.random()-0.5)*60,y:th.y+(Math.random()-0.5)*60};
         h.target=null;h.lockedTarget=null;h.attackMoveTo=null;h.patrolRoute=null;
         h._path=null;h._pathIdx=0;
@@ -12788,8 +12800,11 @@ AIController.prototype.getEnemyComposition=function(){
     var nFrames=4;
     var wf=u.moving?(Math.floor((u.walkPhase+u.walkOffset)*frameSpeed)%nFrames):4;
     sp=bakeUnit(u.race,u.role,u.team,spriteDir,wf,u.heroType);
-  } else {
-    sp=bakeUnit(u.race,u.role,u.team,spriteDir,0,u.heroType);
+    } else {
+    var _aU=Math.max(0,Math.min(1,u.attackT||0));
+    var _cU=Math.max(0,Math.min(1,u.castT||0));
+    var _hU=Math.max(0,Math.min(1,u.chopT||0));
+    sp=bakeUnit(u.race,u.role,u.team,spriteDir,0,u.heroType,_aU,_hU,_cU);
   }
   var s=z*(u.isHero?0.9:1);
   var bob=0;
@@ -12844,7 +12859,7 @@ AIController.prototype.getEnemyComposition=function(){
       var _a2=Math.max(0,Math.min(1,u.attackT||0)),_c2=Math.max(0,Math.min(1,u.chopT||0)),_k2=Math.max(0,Math.min(1,u.castT||0));
       var _castHeal=(u.role==='heal')?Math.max(_a2,_k2):_k2;
       ctx.save();ctx.translate(u._handScreenX,u._handScreenY);ctx.scale(flipX?-1:1,1);
-      _self._mainW(ctx,u.role,u.race,_a2,_c2,_castHeal,s);
+            _self._mainW(ctx,u.role,u.race,_a2,_c2,_castHeal,s,u.animT||0);
       ctx.restore();
     }
   };
@@ -14558,7 +14573,7 @@ UISys.prototype.cycleActiveUnit=function(dir){
         var hand=Renderer_._armsCtx(ctx,tempU,pObj,s,false,1);
         if(hand){
           ctx.save();ctx.translate(hand.x,hand.y);
-          Renderer_._mainW(ctx,ent.role,ent.race,0,0,0,s);
+                    Renderer_._mainW(ctx,ent.role,ent.race,0,0,0,s,0);
           ctx.restore();
         }
       }
@@ -14812,6 +14827,7 @@ UISys.prototype._refreshPortraitBars=function(){
   var btn=document.createElement('button');
   btn.className='act-btn'+(active?' active':'')+(cls?' '+cls:'');
   if(disabled) btn.disabled=true;
+  if(hotkey) btn.dataset.hotkey=String(hotkey).toLowerCase();
   var html='';
   if(icon) html+='<div class="ico">'+icon+'</div>';
   // ПАТЧ #2: подпись клавиши слева от текста
@@ -15022,8 +15038,11 @@ UISys.prototype.upgradeUnit=function(role,stat){
     var _hvQ=getHeroVariant(b.race,_hTypeArg);
     if(_hvQ) def=_hvQ;
   }
-  var _nonSummon=0;
-  for(var _nsi=0;_nsi<g.units.length;_nsi++) if(!g.units[_nsi]._isSummon) _nonSummon++;
+    var _nonSummon=0;
+  for(var _nsi=0;_nsi<g.units.length;_nsi++){
+    var _nsu=g.units[_nsi];
+    if(!_nsu._isSummon && !_nsu.dying && _nsu.pid===g.playerPid) _nonSummon++;
+  }
   var _queuedCount=0;
   for(var _qbi=0;_qbi<g.buildings.length;_qbi++){
     var _qb=g.buildings[_qbi];
