@@ -327,7 +327,8 @@ demolish:"Снести",upgrade:"Улучшить",built:"Построено:",t
 repair:"Ремонт",repairTooltip:"Починить повреждённое здание (стоит золото и дерево)",
 line:"Линия",column:"Колонна",box:"Коробка",hold:"Держать (toggle)",
 wUpg:"Оружие",aUpg:"Броня",noTarget:"Нет цели",ultUnlocked:"Ультимейт открыт!",queue:"Очередь",
-resurrect:"Воскресить",mineFull:"Шахта занята, рабочий ждёт очереди",
+// ru
+resurrect:"Воскресить",mineFull:"Шахта заполнена (5/5)",
 goldMine:"Золотая жила",treeRes:"Дерево",remaining:"Осталось",
 finishBuild:"Достроить",upgrading:"Улучшение",
 toMine:"В шахту",toWood:"Рубить деревья",noResNearby:"Рядом нет видимых ресурсов",
@@ -422,7 +423,8 @@ e_hun_mark:"Метка охотника",e_hun_volley:"Залп шипов",e_hu
   repair:"Repair",repairTooltip:"Repair damaged building (costs gold & wood)",
   line:"Line",column:"Column",box:"Box",hold:"Hold (toggle)",
   wUpg:"Weapon",aUpg:"Armor",noTarget:"No target",ultUnlocked:"Ultimate unlocked!",queue:"Queue",
-  resurrect:"Resurrect",mineFull:"Mine is full, worker waiting",
+  // en
+resurrect:"Resurrect",mineFull:"Mine is full (5/5)",
   goldMine:"Gold vein",treeRes:"Tree",remaining:"Remaining",
   finishBuild:"Finish",upgrading:"Upgrading",
   toMine:"To mine",toWood:"Chop wood",noResNearby:"No visible resources nearby",
@@ -7590,9 +7592,9 @@ if(u.role==='siege' && (u.moving || _wDisp2>0.5)){
       u._lastStuckX=u.x;u._lastStuckY=u.y;
     }
   }
-        if(u.dying){
+            if(u.dying){
     u.deathT += dt;
-    if(u.deathT > 1.2 || u.deathT === 0) {
+    if(u.deathT > 1.2) {
       u.dead = true;
       if(!u._isSummon) this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));
     }
@@ -8739,7 +8741,7 @@ Game.prototype.doGather=function(u,dt){
     u.moving=false;
     if(g.kind==='gold'){
       u._insideMine=true;u._waitingForMine=false;
-      if(u._mineSlot<0 || u._mineSlot>=MAX_GATHER_PER_MINE){
+            if(u._mineSlot<0 || u._mineSlot>=MAX_GATHER_PER_MINE){
         var used={};
         for(var mi=0;mi<this.units.length;mi++){
           var mu=this.units[mi];
@@ -8749,7 +8751,7 @@ Game.prototype.doGather=function(u,dt){
         }
         var freeSlot=-1;
         for(var s=0;s<MAX_GATHER_PER_MINE;s++){ if(!used[s]){freeSlot=s;break;} }
-              if(_slotFree<0){
+              if(freeSlot<0){          // ← БЫЛО _slotFree<0, СТАЛО freeSlot<0
         // ПАТЧ #11: не ждём — ищем другую шахту или отменяем
         u._mineSlot=-1;
         u._insideMine=false;u._waitingForMine=false;u._stuckTimer=0;u._stuckCheckTimer=0;u.moving=false;
@@ -10092,9 +10094,11 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
     var rrR=(r2.kind==='gold')?(r2.radius*0.9+30/z):(r2.radius*0.9+20/z);
     if(d2r<rrR*rrR&&d2r<bestRD){bestRD=d2r;bestR=r2;}
   }
-  if(bestR){
+    if(bestR){
+    // ПАТЧ: используем countGatherers — ту же логику, что и в doGather,
+    // иначе игрок может получить "шахта занята" когда есть свободный слот
     var currentGatherers=0;
-    if(bestR.kind==='gold'){for(var gi=0;gi<this.units.length;gi++){var wg=this.units[gi];if(wg.gatherTarget===bestR&&!wg.dying) currentGatherers++;}}
+    if(bestR.kind==='gold') currentGatherers = this.countGatherers(bestR);
     for(wi=0;wi<sel.length;wi++){
       var u2=sel[wi];
       if(u2.role==='worker'){
@@ -10495,7 +10499,7 @@ Renderer.prototype._oneLeg=function(ctx,lx,by,ph,back,lw,lh,moving){
       Renderer.prototype._armsCtx=function(ctx,u,p,s,flipX,zoom){
   if(u.role==='cav'||u.role==='siege'||u.role==='fly') return null;
   var side=flipX?-1:1;
-  var bodyW=(u.isHero?17:u.role==='elite'?21:u.role==='spear'?16:u.role==='ranged'?17:18)*s;
+    var bodyW=(u.isHero?18:u.role==='elite'?21:u.role==='spear'?16:u.role==='ranged'?17:18)*s;
   var bodyH=(u.isHero?26:u.role==='elite'?25:u.role==='spear'?24:u.role==='heal'?26:22)*s;
   var cx=p.x,baseY=p.y+2*zoom;
   var legDef=getLeg(u.role),legH=legDef?legDef.h*s:0;
@@ -10805,10 +10809,9 @@ function AIController(game,team,race,homeX,homeY,pid){
   this.threatProximityTimer=1.2;
   this._enemyHeroDownT=0;
   this._heroAggro=false;
-  this._attackingTag=null;
+    this._attackingTag=null;
   this._attackStartTime=0;
   this._attackDelayT=0;
-  this._scoutAheadTime=0;
   this.goldBalanceTimer=15;
 }
 AIController.prototype.update=function(dt){
@@ -15596,7 +15599,7 @@ else if(sel.length){
               }
             })(_hts[_hti]);
           }
-                        } else {
+                                } else {
           var _trainKeys2=['Q','W','E','R','T','Y','U','I','O'];
           for(i=0;i<roles.length;i++){
             (function(rr, hk){
@@ -15612,8 +15615,6 @@ else if(sel.length){
   +'\nЕда: '+(FOOD_COST[rr]||1)
   +'\nВремя: '+def.time+'с'
   +'\n'+t_('u_'+rr+'_desc');
-              var _trainKeys=['Q','W','E','R','T','Y','U','I','O','P'];
-var _hkT=_trainKeys[i]||'';
               self.addAction(box,unitIconImg(b2.race,rr),uName(b2.race,rr),priceU2,function(){self.queueUnit(b2,rr);},false,false,tipU2,undefined,hk);
             })(roles[i], _trainKeys2[i]);
           }
