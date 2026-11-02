@@ -1165,7 +1165,7 @@ if(race==='gromborn'&&!isBack && !isShaman){
       ctx.fillStyle='#8a9aa8';ctx.fillRect(cx-1.2,headY-headR-1,2.4,headR*0.6);
       ctx.strokeStyle='#2a3a48';ctx.lineWidth=0.7;ctx.strokeRect(cx-1.2,headY-headR-1,2.4,headR*0.6);
     }
-    if(isHero){
+        if(isHero){
       var capeGrad=ctx.createLinearGradient(0,headY,0,bodyBaseY);
       capeGrad.addColorStop(0,color);capeGrad.addColorStop(1,dark);
       ctx.fillStyle=capeGrad;
@@ -1175,13 +1175,30 @@ if(race==='gromborn'&&!isBack && !isShaman){
       ctx.quadraticCurveTo(cx+18,bodyBaseY+6,cx+15,headY+6);
       ctx.closePath();ctx.fill();
       ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
-            // ПАТЧ #13: наплечники ближе к телу (не торчат)
-      ctx.fillStyle='#e6c67a';
-      ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.fill();
-      ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.fill();
-      ctx.strokeStyle='#3a2010';ctx.lineWidth=1;
-      ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.stroke();
-      ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.stroke();
+
+      // ПАТЧ 6-fix: наплечники рисуем ТОЛЬКО спереди (не isBack).
+      if(!isBack){
+        // ПАТЧ #13: наплечники ближе к телу (не торчат)
+        ctx.fillStyle='#e6c67a';
+        ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.fill();
+        ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.fill();
+        ctx.strokeStyle='#3a2010';ctx.lineWidth=1;
+        ctx.beginPath();ctx.ellipse(cx-bw/2-1,bodyBaseY-bh+3,4,3,0.2,0,TAU);ctx.stroke();
+        ctx.beginPath();ctx.ellipse(cx+bw/2+1,bodyBaseY-bh+3,4,3,-0.2,0,TAU);ctx.stroke();
+      } else {
+        // Спина паладина: золотой крест на плаще (без «дырок»)
+        var _crossY=bodyBaseY-bh*0.55;
+        ctx.strokeStyle='#e6c67a';ctx.lineWidth=2.6;ctx.lineCap='round';
+        ctx.beginPath();ctx.moveTo(cx,_crossY-11);ctx.lineTo(cx,_crossY+11);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(cx-7,_crossY-3);ctx.lineTo(cx+7,_crossY-3);ctx.stroke();
+        ctx.strokeStyle='#8a6a1a';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(cx,_crossY-11);ctx.lineTo(cx,_crossY+11);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(cx-7,_crossY-3);ctx.lineTo(cx+7,_crossY-3);ctx.stroke();
+        ctx.lineCap='butt';
+        // Лёгкая тень креста
+        ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.moveTo(cx+1,_crossY-11);ctx.lineTo(cx+1,_crossY+11);ctx.stroke();
+      }
     }
   } else if(race==='gromborn'){
     if(isShaman){
@@ -6877,14 +6894,16 @@ Game.prototype.getBuildingHpBonus=function(pid){
   var upg=SAWMILL_UPG[best-1];
   return upg?upg.hpBonus:0;
 };
-Game.prototype.countGatherers=function(res){
+Game.prototype.countGatherers=function(res,excludeList){
   // ПАТЧ #11: не считаем тех кто в очереди ожидания
+  // ПАТЧ 2-fix: excludeList — рабочих из текущего выделения не считаем
   var n=0;
   for(var i=0;i<this.units.length;i++){
     var u=this.units[i];
     if(u.dying) continue;
     if(u.gatherTarget!==res) continue;
     if(u._waitingForMine) continue;
+    if(excludeList && excludeList.indexOf(u)>=0) continue;
     n++;
   }
   return n;
@@ -7386,8 +7405,8 @@ Game.prototype._wouldHitResource=function(x,y,radius,ignore){
     for(var i=0;i<arr.length;i++){
       var r=arr[i];
       if(r===ignore||r.dead||r.falling) continue;
-            // ПАТЧ #8: деревья чуть уже, чтобы не залипали между двумя стволами
-      var rr=(r.kind==='gold')?r.radius*0.55:30;
+      // ПАТЧ 5-fix: реальный радиус дерева 42, берём 38 — не проходим насквозь, но не застреваем в щелях
+      var rr=(r.kind==='gold')?r.radius*0.65:38;
       var ddx=x-r.x,ddy=y-r.y,minD=radius+rr;
       if(ddx*ddx+ddy*ddy<minD*minD) return r;
     }
@@ -7435,12 +7454,13 @@ Game.prototype._markAutoAcquire=function(u){
   this._mineCacheTimer-=dt;
   if(this._mineCacheTimer<=0){
     this._mineCacheTimer=0.3;
-        this._mineWorkerCache={};
+            this._mineWorkerCache={};
     for(var _mcI=0;_mcI<this.units.length;_mcI++){
       var _mcU=this.units[_mcI];
       if(_mcU.dying||_mcU.dead) continue;
-      // ПАТЧ #11: считаем только тех кто РЕАЛЬНО внутри (макс = MAX_GATHER_PER_MINE)
-      if(_mcU._insideMine && _mcU.gatherTarget && _mcU.gatherTarget.kind==='gold'){
+      // ПАТЧ 3-fix: считаем всех НАЗНАЧЕННЫХ на шахту (внутри/идут/несут),
+      // а не только тех, кто физически внутри
+      if(_mcU.gatherTarget && _mcU.gatherTarget.kind==='gold' && !_mcU.gatherTarget.dead){
         var _mcId=_mcU.gatherTarget.id;
         this._mineWorkerCache[_mcId]=(this._mineWorkerCache[_mcId]||0)+1;
       }
@@ -7592,6 +7612,21 @@ Game.prototype._smartMove=function(u,dx,dy,spd){
   var _mw=(u.role==='worker'&&u.gatherTarget);
   var _wpid=u.pid;
   var _bh=function(x,y,ig){return this._wouldHitBuilding(x,y,u.radius,ig,_mw,_wpid);}.bind(this);
+
+  // ПАТЧ 5-fix: если юнит УЖЕ пересёкся с деревом (после остановки/застревания) —
+  // мягко выталкиваем наружу. Иначе он "проходит насквозь" или застревает.
+  var _stuckRes=this._wouldHitResource(u.x,u.y,u.radius,u.gatherTarget);
+  if(_stuckRes){
+    var _sdx=u.x-_stuckRes.x,_sdy=u.y-_stuckRes.y;
+    var _sdist=Math.hypot(_sdx,_sdy);
+    var _sMinR=u.radius+((_stuckRes.kind==='gold')?_stuckRes.radius*0.65:38)+2;
+    if(_sdist<_sMinR){
+      if(_sdist<0.01){_sdx=Math.random()-0.5;_sdy=Math.random()-0.5;_sdist=1;}
+      u.x=this.clampX(_stuckRes.x+_sdx/_sdist*_sMinR);
+      u.y=this.clampY(_stuckRes.y+_sdy/_sdist*_sMinR);
+    }
+  }
+
   var nx=u.x+dx/d*spd,ny=u.y+dy/d*spd;
   var blockedB=_bh(nx,ny,null);
   var blockedR=this._wouldHitResource(nx,ny,u.radius,u.gatherTarget);
@@ -9299,7 +9334,7 @@ Game.prototype.findNearestResource=function(x,y,kind,pid){
   }
   return best;
 };
-Game.prototype.findVisibleResourceForWorker=function(u,kind,radius){
+Game.prototype.findVisibleResourceForWorker=function(u,kind,radius,excludeWorkers){
   var best=null,bd=Infinity;
   var team=this.playerTeam;
   for(var s=0;s<this.config.slots.length;s++){
@@ -9319,7 +9354,8 @@ Game.prototype.findVisibleResourceForWorker=function(u,kind,radius){
       if(Math.hypot(b.x-r.x,b.y-r.y)<520){nearEnemyBase=true;break;}
     }
     if(nearEnemyBase) continue;
-    if(kind==='gold'&&this.countGatherers(r)>=MAX_GATHER_PER_MINE) continue;
+    // ПАТЧ 2-fix: excludeWorkers — не считаем тех, кого сами же отправляем
+    if(kind==='gold'&&this.countGatherers(r,excludeWorkers)>=MAX_GATHER_PER_MINE) continue;
     var d=(r.x-u.x)*(r.x-u.x)+(r.y-u.y)*(r.y-u.y);
     if(d<r2&&d<bd){bd=d;best=r;}
   }
@@ -13023,9 +13059,12 @@ AIController.prototype.getEnemyComposition=function(){
     var drawY=p.y-sp.height*s*0.94-bob;
   // ПАТЧ 3.2: Функция для рисования рук и оружия
   var _self=this;
-    var _drawArmsWeapon=function(){
+            var _drawArmsWeapon=function(){
     if(u.role==='cav'||u.role==='siege'||u.role==='fly'||_isVariantHero) return;
-    if(u.dir===DIR.UP) return;   // ПАТЧ 10: не рисуем руки поверх спины — оружие уже в спрайте
+    // ПАТЧ 6-fix: для ГЕРОЯ при UP руки не рисуем — у него в спрайте уже есть кончик клинка,
+    // а кисти/оружие спереди при UP выглядят как «дырки» на спине.
+    // Для НЕ-героев оставляем (руки по бокам торса читаются нормально).
+    if(u.isHero && u.dir===DIR.UP) return;
     _self._arms(u,p,s,flipX);
     if(u._handScreenX!==null && u._handScreenX!==undefined){
       var _a2=Math.max(0,Math.min(1,u.attackT||0)),_c2=Math.max(0,Math.min(1,u.chopT||0)),_k2=Math.max(0,Math.min(1,u.castT||0));
@@ -13035,7 +13074,8 @@ AIController.prototype.getEnemyComposition=function(){
       ctx.restore();
     }
   };
-    // ПАТЧ 10: удалён вызов `if(u.dir===DIR.UP) _drawArmsWeapon();` — при UP руки не рисуем вовсе
+        // ПАТЧ 1-fix: при UP руки рисуются ДО спрайта — они за спиной
+  if(u.dir===DIR.UP) _drawArmsWeapon();
   if(flipX){ctx.save();ctx.translate(p.x,0);ctx.scale(-1,1);ctx.drawImage(sp,-sp.width*s/2,drawY,sp.width*s,sp.height*s);ctx.restore();}
   else ctx.drawImage(sp,p.x-sp.width*s/2,drawY,sp.width*s,sp.height*s);
     if(u.role==='siege'&&!u.dying){
@@ -14527,22 +14567,22 @@ UISys.prototype.refreshSelection=function(){
   for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
   for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
   var info=this.$('selinfo');
-  if(g.selResource&&!sel.length&&!selB.length){
+    if(g.selResource&&!sel.length&&!selB.length){
     var rr=g.selResource;
     info.classList.add('show');
-    var inside=0,waiting=0;
+    var inside=0,waiting=0,assigned=0;
     var workersList=[];
     for(var _wi=0;_wi<g.units.length;_wi++){
       var _wu=g.units[_wi];
       if(_wu.pid!==g.playerPid||_wu.dying) continue;
       if(_wu.gatherTarget===rr){
         workersList.push(_wu);
+        assigned++;
         if(_wu._insideMine) inside++;
         else if(_wu._waitingForMine) waiting++;
       }
     }
-        // ПАТЧ #11: убрали "Ждут" — рабочие больше не ждут снаружи
-    info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+inside+'/'+MAX_GATHER_PER_MINE;
+    info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Назначено: '+assigned+'/'+MAX_GATHER_PER_MINE;
     this.$('cmdpanel').classList.add('show');
     this.drawMinePortrait(rr,workersList);
     var box=this.$('actions');box.innerHTML='';box.dataset.menu='';
@@ -14592,13 +14632,14 @@ UISys.prototype.refreshInfoOnly=function(){
   for(var i=0;i<g.units.length;i++){var u=g.units[i];if(u.sel&&u.pid===g.playerPid&&!u.dying) sel.push(u);}
   for(var bi=0;bi<g.buildings.length;bi++){var b=g.buildings[bi];if(b.sel&&b.pid===g.playerPid) selB.push(b);}
   // ПАТЧ #1: обновление текста по выделенной шахте
-  if(g.selResource&&!sel.length&&!selB.length){
+    if(g.selResource&&!sel.length&&!selB.length){
     var rr=g.selResource;
-    var _inCnt=0,_waitCnt=0;
+    var _inCnt=0,_waitCnt=0,_asgCnt=0;
     for(var _wi=0;_wi<g.units.length;_wi++){
       var _wu=g.units[_wi];
       if(_wu.pid!==g.playerPid||_wu.dying) continue;
       if(_wu.gatherTarget===rr){
+        _asgCnt++;
         if(_wu._insideMine) _inCnt++;
         else if(_wu._waitingForMine) _waitCnt++;
       }
@@ -14606,7 +14647,7 @@ UISys.prototype.refreshInfoOnly=function(){
     var info=this.$('selinfo');
     if(info){
       info.classList.add('show');
-            info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Внутри: '+_inCnt+'/'+MAX_GATHER_PER_MINE;
+            info.textContent=(rr.kind==='gold'?t_('goldMine'):t_('treeRes'))+' | '+t_('remaining')+': '+Math.floor(rr.amount)+'/'+rr.maxAmount+' | Назначено: '+_asgCnt+'/'+MAX_GATHER_PER_MINE;
     }
     // ПАТЧ #1: обновлять полосу ресурса в портрете
     var pInfo=this.$('portrait-info');
@@ -14946,12 +14987,12 @@ UISys.prototype.drawMinePortrait=function(res,workersList){
   var pct=Math.max(0,Math.min(100,Math.round(res.amount/res.maxAmount*100)));
   var html='<div class="pname">'+(res.kind==='gold'?t_('goldMine'):t_('treeRes'))+'</div>';
   html+='<div class="pbar"><div class="fill" style="width:'+pct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">'+Math.floor(res.amount)+'</div></div>';
-  html+='<div class="prow"><span>Рабочих:</span><span class="v">'+workersList.length+'</span></div>';
+    html+='<div class="prow"><span>Назначено:</span><span class="v">'+workersList.length+'/'+MAX_GATHER_PER_MINE+'</span></div>';
   if(res.kind==='gold'){
     var inCnt=0,waitCnt=0;
     for(var i=0;i<workersList.length;i++){if(workersList[i]._insideMine) inCnt++;else if(workersList[i]._waitingForMine) waitCnt++;}
     html+='<div class="prow"><span>Внутри:</span><span class="v">'+inCnt+'/'+MAX_GATHER_PER_MINE+'</span></div>';
-    html+='<div class="prow"><span>В очереди:</span><span class="v">'+waitCnt+'</span></div>';
+    html+='<div class="prow"><span>Ждут:</span><span class="v">'+waitCnt+'</span></div>';
   }
   info.innerHTML=html;
 };
@@ -15446,8 +15487,8 @@ UISys.prototype.renderActions=function(force){
         var hasMana=(curMana)>=(ab.mana||0);
         var canUse=!isPassive&&lvl>0&&cd<=0&&(ab.type!=='ultimate'||hero.ultUnlocked)&&hasMana&&!_stunnedHero;
         var btnDisabled=!(canLvlUp||canUse);
-        var key=abIdx===0?'[Q] ':abIdx===1?'[W] ':ab.type==='ultimate'?'[R] ':'[E] ';
-        var label=key+t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
+                var _abKeyChar=abIdx===0?'Q':abIdx===1?'W':ab.type==='ultimate'?'R':'E';
+        var label=t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
         if(ab.type==='ultimate'){
           if(!hero.ultUnlocked) label+=' (X)';
           else if(lvl<3&&!canLvlUp){label+=' (ур.'+(6+lvl*2)+')';}
@@ -15474,7 +15515,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
         if(ab.targeted) tip+='\nНаводимая: кликните по цели';
         if(_stunnedHero) tip+='\n\n⚠ ОГЛУШЁН — каст невозможен';
         var _btnCls='ability'+(canLvlUp?' can-level':'');
-                var _btn=self.addAction(box,toolIconImg(iconName,48),label,price,function(){
+                        var _btn=self.addAction(box,toolIconImg(iconName,48),label,price,function(){
           if(canLvlUp){
             hero.abilityLevels[ab.id]=lvl+1;hero.skillPoints--;hero._recalc();self.renderActions(true);
           } else if(canUse){
@@ -15489,7 +15530,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
               g.castAbility(hero,ab.id);
             }
           }
-        },false,btnDisabled,tip,_btnCls);
+        },false,btnDisabled,tip,_btnCls,_abKeyChar);
         if(_btn){
           _btn.oncontextmenu=function(e){
             e.preventDefault();
@@ -15519,9 +15560,9 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
     var _heroGroup=[hero];
   for(var _hz=0;_hz<sel.length;_hz++){if(sel[_hz]!==hero&&sel[_hz].role!=='worker') _heroGroup.push(sel[_hz]);}
   var _sepC=document.createElement('div');_sepC.className='section-sep';_sepC.textContent='Приказы';box.appendChild(_sepC);
-  this.addAction(box,toolIconImg('attack'),'[A] A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack');
-  this.addAction(box,toolIconImg('stop'),'[S] Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();});
-  this.addAction(box,toolIconImg('patrol'),'[P] Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol');
+    this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,null,undefined,'A');
+  this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,null,undefined,'S');
+  this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,null,undefined,'P');
   this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
   this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
   this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
@@ -15556,7 +15597,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
     g.selectAllCombat();
     self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
   },false,false,'Выделить всех войск');
-  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
 }
 else if(sel.length){
   var workers=[],fighters=[];
@@ -15569,11 +15610,11 @@ else if(sel.length){
     var _hkL=(_wk_keys.toWood||'l').toUpperCase();
     var _hkR=(_wk_keys.repair||'r').toUpperCase();
     if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();},false,false,'Построить здание',undefined,_hkB);
-    this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
+        this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
       var assigned=0;
       for(var wi=0;wi<workers.length;wi++){
         var wk=workers[wi];
-        var mine=g.findVisibleResourceForWorker(wk,'gold',1600);
+        var mine=g.findVisibleResourceForWorker(wk,'gold',1600,workers);
         if(mine){
           wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
           wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
@@ -15587,11 +15628,11 @@ else if(sel.length){
       if(!assigned) g.notify(t_('noResNearby'));
       else Audio.sfx('click');
     },false,false,'Добывать золото',undefined,_hkG);
-    this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
+        this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
       var assigned=0;
       for(var wi=0;wi<workers.length;wi++){
         var wk=workers[wi];
-        var tree=g.findVisibleResourceForWorker(wk,'tree',1600);
+        var tree=g.findVisibleResourceForWorker(wk,'tree',1600,workers);
         if(tree){
           wk.gatherTarget=tree;wk._assignedMine=null;wk.carrying=null;wk.carryAmt=0;
           wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
@@ -15634,12 +15675,12 @@ else if(sel.length){
         Audio.sfx('repair');
       },false,false,repairTip,undefined,_hkR);
     }
-    this.addAction(box,'<img src="'+getWorkersIconURL(race)+'" alt="">',t_('workersAll'),null,function(){g.selectWorkers();});
+       this.addAction(box,'<img src="'+getWorkersIconURL(race)+'" alt="">',t_('workersAll'),null,function(){g.selectWorkers();},false,false,'Выделить всех рабочих',undefined,'Tab');
   }
   if(fighters.length){
-    this.addAction(box,toolIconImg('attack'),'[A] A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack');
-    this.addAction(box,toolIconImg('stop'),'[S] Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();});
-    this.addAction(box,toolIconImg('patrol'),'[P] Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol');
+        this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,null,undefined,'A');
+    this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,null,undefined,'S');
+    this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,null,undefined,'P');
     this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
     this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
     this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
@@ -15677,7 +15718,7 @@ else if(sel.length){
       self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
     },false,false,'Выделить всех войск');
   }
-  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
 }
 
       if(selB.length){
@@ -15955,7 +15996,7 @@ else if(sel.length){
     } else if(b2.kind!=='townhall'){
       this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);});
     }
-    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();});
+    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
   }
 };
 
@@ -15994,8 +16035,7 @@ else if(sel.length){
     if(canLvlUp) _btn.classList.add('can-level'); else _btn.classList.remove('can-level');
     var lblEl=_btn.querySelector('.lbl');
     if(lblEl){
-      var key=abIdx===0?'[Q] ':abIdx===1?'[W] ':ab.type==='ultimate'?'[R] ':'[E] ';
-      var newLbl=key+t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
+            var newLbl=t_(ab.k)+(lvl>0?' '+lvl+'/3':'');
       if(ab.type==='ultimate'){
         if(!hero.ultUnlocked) newLbl+=' (X)';
         else if(lvl<3&&!canLvlUp){newLbl+=' (ур.'+(6+lvl*2)+')';}
@@ -16578,23 +16618,37 @@ function clearAllCaches(){
       if(_wu.role==='worker') _wlist.push(_wu);
       if(_wu.isHero) _hasHero=true;
     }
-    if(_wlist.length && !_hasHero){
+        if(_wlist.length && !_hasHero){
       if(k===_K.toMine){
         e.preventDefault();
+        var _assignN=0;
         for(var _wj=0;_wj<_wlist.length;_wj++){
           var _wk=_wlist[_wj];
-          var _m=Game_.findVisibleResourceForWorker(_wk,'gold',900);
-          if(_m){_wk.gatherTarget=_m;_wk._assignedMine=_m;_wk.moveTo=null;_wk._path=null;_wk._pathIdx=0;}
+          var _m=Game_.findVisibleResourceForWorker(_wk,'gold',1600,_wlist);
+          if(_m){
+            _wk.gatherTarget=_m;_wk._assignedMine=_m;
+            _wk.moveTo=null;_wk._path=null;_wk._pathIdx=0;
+            _wk._insideMine=false;_wk._mineSlot=-1;_wk._waitingForMine=false;
+            _assignN++;
+          }
         }
+        if(!_assignN) Game_.notify(t_('noResNearby'));
         return;
       }
       if(k===_K.toWood){
         e.preventDefault();
+        var _assignN2=0;
         for(var _wj2=0;_wj2<_wlist.length;_wj2++){
           var _wk2=_wlist[_wj2];
-          var _tr=Game_.findVisibleResourceForWorker(_wk2,'tree',900);
-          if(_tr){_wk2.gatherTarget=_tr;_wk2.moveTo=null;_wk2._path=null;_wk2._pathIdx=0;}
+          var _tr=Game_.findVisibleResourceForWorker(_wk2,'tree',1600,_wlist);
+          if(_tr){
+            _wk2.gatherTarget=_tr;_wk2._assignedMine=null;
+            _wk2.moveTo=null;_wk2._path=null;_wk2._pathIdx=0;
+            _wk2._insideMine=false;_wk2._mineSlot=-1;_wk2._waitingForMine=false;
+            _assignN2++;
+          }
         }
+        if(!_assignN2) Game_.notify(t_('noResNearby'));
         return;
       }
       if(k===_K.build){ e.preventDefault(); if(UI) UI.showBuildMenu(); return; }
