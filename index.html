@@ -57,7 +57,10 @@ h3{color:#e6c67a;font-size:17px;margin-bottom:14px;text-align:center}
 #portrait-info .pbar{height:9px;background:#000;border-radius:2px;overflow:hidden;margin-top:2px;position:relative;border:1px solid #2a3a52}
 #portrait-info .pbar .fill{height:100%;transition:width .15s linear}
 #portrait-info .pbar .lbl{position:absolute;inset:0;text-align:center;font-size:7px;line-height:9px;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 2px #000;font-weight:700}
-#portrait-info .prow{display:flex;justify-content:space-between;font-size:8px;color:#b8c5d6;margin-top:1px}
+#portrait-info .prow{display:flex;justify-content:space-between;font-size:8px;color:#b8c5d6;margin-top:1px;gap:4px;white-space:nowrap;min-width:0}
+#portrait-info .prow>span:first-child{white-space:nowrap;flex-shrink:0}
+#portrait-info .prow .v{color:#ffe9a8;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:1px}
+#portrait-info .prow .v img{display:inline-block}
 #portrait-info .prow .v{color:#ffe9a8}
 #portrait-info .prow .v img{display:inline}
 #unit-bar{position:absolute;bottom:180px;left:4px;display:none;gap:3px;pointer-events:auto;overflow-x:auto;overflow-y:hidden;padding:3px;background:rgba(10,16,28,.9);border:2px solid #557096;border-radius:5px;max-width:min(96vw,720px);height:58px;z-index:6}
@@ -145,7 +148,7 @@ h3{color:#e6c67a;font-size:17px;margin-bottom:14px;text-align:center}
 #go-stats>div>div>div{word-break:break-word}
 .aura-badge img{display:block}
 @media (max-width:600px){#keys-block{display:none!important}}
-@media (max-width:600px){#minimap{width:80px;height:80px}#hud-menu{top:96px}#controls{top:134px}#topbar{font-size:11px;padding:5px 8px;gap:8px;max-width:calc(100vw - 160px)}#portrait-wrap{width:76px}#portrait-canvas{height:56px}.slot-row .num{width:24px;height:24px;line-height:24px;font-size:11px}.slot-row .team-sel{flex:0 0 58px}#actions{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}#unit-bar{bottom:190px;height:50px}#unit-bar .ubtn{width:42px;height:42px}}
+@media (max-width:600px){#minimap{width:80px;height:80px}#hud-menu{top:96px}#controls{top:134px}#topbar{font-size:11px;padding:5px 8px;gap:8px;max-width:calc(100vw - 160px)}#portrait-wrap{width:100px}#portrait-canvas{height:60px}.slot-row .num{width:24px;height:24px;line-height:24px;font-size:11px}.slot-row .team-sel{flex:0 0 58px}#actions{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}#unit-bar{bottom:190px;height:50px}#unit-bar .ubtn{width:42px;height:42px}}
 </style>
 </head>
 
@@ -1095,16 +1098,6 @@ if(race==='gromborn'&&!isBack && !isShaman){
 }
 
         if(isBack){
-    if(role==='melee'||role==='spear'||role==='elite'||role==='hero'){
-      ctx.fillStyle=shade(color,-0.3);
-      ctx.beginPath();
-      ctx.moveTo(cx-bw/2,bodyBaseY-bh+2);
-      ctx.lineTo(cx-bw/2-3,bodyBaseY+4);
-      ctx.lineTo(cx+bw/2+3,bodyBaseY+4);
-      ctx.lineTo(cx+bw/2,bodyBaseY-bh+2);
-      ctx.closePath();ctx.fill();
-      ctx.strokeStyle='#2a1a08';ctx.lineWidth=0.9;ctx.stroke();
-    }
     if(race==='gromborn'||race==='luminite'){
       ctx.strokeStyle='#3a2010';ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(cx-bw/2+2,bodyBaseY-bh*0.35);ctx.lineTo(cx+bw/2-2,bodyBaseY-bh*0.5);ctx.stroke();
@@ -1513,7 +1506,7 @@ function drawInquisitorSide(ctx,W,H,team,atk,cast){
   ctx.beginPath();ctx.ellipse(cx,baseY+3,18,5,0,0,TAU);ctx.fill();
   ctx.fillStyle='#2a1a10';ctx.fillRect(cx-4,baseY-17,5,17);
   ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.strokeRect(cx-4,baseY-17,5,17);
-  var robeG=ctx.createLinearGradient(cx-12,0,cx+12,0);
+    var robeG=ctx.createLinearGradient(cx-12,0,cx+12,0);
   robeG.addColorStop(0,'#1a0808');robeG.addColorStop(0.5,'#5a1a1a');robeG.addColorStop(1,'#1a0808');
   ctx.fillStyle=robeG;
   ctx.beginPath();ctx.moveTo(cx-10,baseY-44);ctx.lineTo(cx+10,baseY-44);
@@ -1523,6 +1516,20 @@ function drawInquisitorSide(ctx,W,H,team,atk,cast){
   for(var _bi=0;_bi<5;_bi++){
     ctx.beginPath();ctx.arc(cx-8+_bi*3,baseY-38,1.6,0,TAU);ctx.fill();
     ctx.strokeStyle='#3a2010';ctx.lineWidth=0.6;ctx.stroke();
+  }
+  // ПАТЧ 11: пояс с черепом + рваный низ мантии (узнаваемый «изгой»)
+  ctx.fillStyle='#2a1a08';ctx.fillRect(cx-11,baseY-30,22,4);
+  ctx.strokeStyle='#0a0504';ctx.lineWidth=1;ctx.strokeRect(cx-11,baseY-30,22,4);
+  ctx.fillStyle='#e8e0d0';
+  ctx.beginPath();ctx.arc(cx,baseY-28,3,0,TAU);ctx.fill();
+  ctx.strokeStyle='#3a2010';ctx.lineWidth=0.8;ctx.stroke();
+  ctx.fillStyle='#0a0000';
+  ctx.beginPath();ctx.arc(cx-1,baseY-28.5,0.7,0,TAU);ctx.arc(cx+1,baseY-28.5,0.7,0,TAU);ctx.fill();
+  ctx.fillStyle='#1a0808';
+  for(var _ripI=0;_ripI<5;_ripI++){
+    var _ripX=cx-13+_ripI*5;
+    ctx.beginPath();
+    ctx.moveTo(_ripX,baseY-2);ctx.lineTo(_ripX+2.5,baseY+4);ctx.lineTo(_ripX+5,baseY-2);ctx.closePath();ctx.fill();
   }
   ctx.strokeStyle='#7a9a52';ctx.lineWidth=3.4;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(cx+8,baseY-44);ctx.lineTo(cx+14,baseY-36);ctx.lineTo(cx+18,baseY-28);ctx.stroke();
@@ -1540,9 +1547,16 @@ function drawInquisitorSide(ctx,W,H,team,atk,cast){
   ctx.fillStyle='#1a0500';ctx.beginPath();ctx.arc(cx+4,headCY-1,0.9,0,TAU);ctx.fill();
   ctx.strokeStyle='#a04040';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(cx-2,headCY-2);ctx.lineTo(cx+1,headCY+2);ctx.stroke();
-  ctx.fillStyle='#1a0808';
-  ctx.beginPath();ctx.arc(cx,headCY,headR+3,Math.PI,TAU,false);ctx.closePath();ctx.fill();
-  ctx.strokeStyle='#0a0404';ctx.lineWidth=1.2;ctx.stroke();
+    // ПАТЧ 11: убрали «колпак». Вместо него — ухо орка + шрам (как во фронтальном виде).
+  ctx.fillStyle='#7a9a52';ctx.strokeStyle='#3a5a1a';ctx.lineWidth=0.9;
+  ctx.beginPath();
+  ctx.moveTo(cx-2,headCY-headR+3);
+  ctx.quadraticCurveTo(cx-10,headCY-headR-1,cx-10,headCY-headR+4);
+  ctx.quadraticCurveTo(cx-7,headCY-headR+3,cx-2,headCY-headR+5);
+  ctx.closePath();ctx.fill();ctx.stroke();
+  // Шрам через правую часть лица
+  ctx.strokeStyle='#a04040';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx+5,headCY-4);ctx.lineTo(cx+3,headCY+2);ctx.stroke();
     var _staffLift=cast*8+atk*3;
   var _staffThrust=atk*12;
   var staffX=cx+18+_staffThrust,staffTop=baseY-72-_staffLift,staffBot=baseY-2;
@@ -3613,17 +3627,23 @@ function drawFlyer(ctx,W,H,race,team,dir,frame){
       function drawBanditHumanoid(kind,ctx,W,H,baseY,cx,frame){
   frame=frame|0;
   var legPhase=frame/4*TAU;
-  var legSwing=Math.sin(legPhase)*5;
-  var armSwing=Math.sin(legPhase+Math.PI)*4;
-  var bob=Math.abs(Math.sin(frame/4*Math.PI))*1.5;
+  var legSwingL=Math.sin(legPhase)*5;
+  var legSwingR=Math.sin(legPhase+Math.PI)*5;
+  var legLiftL=Math.max(0,Math.sin(legPhase))*3;
+  var legLiftR=Math.max(0,Math.sin(legPhase+Math.PI))*3;
+  var armSwing=Math.sin(legPhase+Math.PI)*5;
+  var bob=Math.abs(Math.sin(legPhase*2))*1.5;
   ctx.save();
   ctx.translate(0,-bob);
   ctx.fillStyle='#2a1a0a';ctx.strokeStyle='#000';ctx.lineWidth=1;
-  ctx.fillRect(cx-6+legSwing*0.5,baseY-14,4,14);ctx.strokeRect(cx-6+legSwing*0.5,baseY-14,4,14);
-  ctx.fillRect(cx+2-legSwing*0.5,baseY-14,4,14);ctx.strokeRect(cx+2-legSwing*0.5,baseY-14,4,14);
+  // ПАТЧ 13: ноги с подъёмом стопы в фазе шага (нормальная ходьба)
+  ctx.fillRect(cx-6+legSwingL*0.5,baseY-14+legLiftL*0.3,4,14-legLiftL);
+  ctx.strokeRect(cx-6+legSwingL*0.5,baseY-14+legLiftL*0.3,4,14-legLiftL);
+  ctx.fillRect(cx+2+legSwingR*0.5,baseY-14+legLiftR*0.3,4,14-legLiftR);
+  ctx.strokeRect(cx+2+legSwingR*0.5,baseY-14+legLiftR*0.3,4,14-legLiftR);
   ctx.fillStyle='#1a0a04';
-  ctx.fillRect(cx-7+legSwing*0.5,baseY-2,6,3);
-  ctx.fillRect(cx+1-legSwing*0.5,baseY-2,6,3);
+  ctx.fillRect(cx-7+legSwingL*0.5,baseY-2-legLiftL,6,3);
+  ctx.fillRect(cx+1+legSwingR*0.5,baseY-2-legLiftR,6,3);
   var tg=ctx.createLinearGradient(cx-10,0,cx+10,0);
   var bc1='#5a1010',bc2='#8a2020';
   if(kind==='bandit_bow'){bc1='#1a2a1a';bc2='#3a5a2a';}
@@ -3690,13 +3710,42 @@ function drawFlyer(ctx,W,H,race,team,dir,frame){
     ctx.strokeStyle='#1a1a20';ctx.lineWidth=1;ctx.stroke();
   }
   else if(kind==='bandit_bow'){
-    ctx.strokeStyle='#5a3a15';ctx.lineWidth=2.2;
-    ctx.beginPath();ctx.arc(cx+14+armSwing*0.4,baseY-30,10,-Math.PI*0.7,Math.PI*0.7);ctx.stroke();
-    ctx.strokeStyle='#e0d8c0';ctx.lineWidth=0.6;
-    ctx.beginPath();
-    ctx.moveTo(cx+14+armSwing*0.4+10*Math.cos(-Math.PI*0.7),baseY-30+10*Math.sin(-Math.PI*0.7));
-    ctx.lineTo(cx+14+armSwing*0.4+10*Math.cos(Math.PI*0.7),baseY-30+10*Math.sin(Math.PI*0.7));
-    ctx.stroke();
+    // ПАТЧ 13: полноценный лук с тетивой, рогами, натяжением и стрелой
+    var _bowX=cx+14+armSwing*0.4;
+    var _bowY=baseY-30;
+    var _bowR=11;
+    var _pullT=Math.max(0,Math.min(1,Math.sin((frame/4)*Math.PI)));
+    var _pullDist=_pullT*6;
+    // Дуга лука
+    ctx.strokeStyle='#5a3a15';ctx.lineWidth=2.4;
+    ctx.beginPath();ctx.arc(_bowX,_bowY,_bowR,-Math.PI*0.72,Math.PI*0.72);ctx.stroke();
+    ctx.strokeStyle='#2a1508';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.arc(_bowX,_bowY,_bowR,-Math.PI*0.72,Math.PI*0.72);ctx.stroke();
+    // Концы (рога) лука
+    var _tX=_bowX+_bowR*Math.cos(-Math.PI*0.72),_tY=_bowY+_bowR*Math.sin(-Math.PI*0.72);
+    var _bX=_bowX+_bowR*Math.cos(Math.PI*0.72),_bY=_bowY+_bowR*Math.sin(Math.PI*0.72);
+    ctx.fillStyle='#3a2010';
+    ctx.beginPath();ctx.arc(_tX,_tY,1.6,0,TAU);ctx.fill();
+    ctx.beginPath();ctx.arc(_bX,_bY,1.6,0,TAU);ctx.fill();
+    // Тетива (натягивается)
+    ctx.strokeStyle='#e0d8c0';ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.moveTo(_tX,_tY);ctx.lineTo(_bowX-_pullDist,_bowY);ctx.lineTo(_bX,_bY);ctx.stroke();
+    // Стрела во время натяжения
+    if(_pullT>0.05){
+      ctx.strokeStyle='#8a6a3a';ctx.lineWidth=1.3;
+      ctx.beginPath();ctx.moveTo(_bowX-_pullDist,_bowY);ctx.lineTo(_bowX+12,_bowY);ctx.stroke();
+      ctx.fillStyle='#c8c8c8';
+      ctx.beginPath();
+      ctx.moveTo(_bowX+15,_bowY);
+      ctx.lineTo(_bowX+11,_bowY-1.8);
+      ctx.lineTo(_bowX+11,_bowY+1.8);
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#2a2a30';ctx.lineWidth=0.5;ctx.stroke();
+      // Оперение стрелы
+      ctx.fillStyle='#c04040';
+      ctx.beginPath();ctx.moveTo(_bowX-_pullDist,_bowY-1.5);ctx.lineTo(_bowX-_pullDist-3,_bowY-3.5);ctx.lineTo(_bowX-_pullDist-2,_bowY-1.5);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(_bowX-_pullDist,_bowY+1.5);ctx.lineTo(_bowX-_pullDist-3,_bowY+3.5);ctx.lineTo(_bowX-_pullDist-2,_bowY+1.5);ctx.closePath();ctx.fill();
+    }
   }
   else if(kind==='bandit_spear'){
     ctx.strokeStyle='#6a4a2a';ctx.lineWidth=2.4;
@@ -3705,6 +3754,7 @@ function drawFlyer(ctx,W,H,race,team,dir,frame){
     ctx.beginPath();ctx.moveTo(cx+14+armSwing*0.4,baseY-52);ctx.lineTo(cx+17+armSwing*0.4,baseY-46);ctx.lineTo(cx+11+armSwing*0.4,baseY-46);ctx.closePath();ctx.fill();
     ctx.strokeStyle='#3a3a40';ctx.lineWidth=0.8;ctx.stroke();
   }
+  // ПАТЧ 13: замах только у ближников; у лучника лук уже анимирован выше
   if(kind==='bandit'||kind==='bandit_axe'||kind==='bandit_spear'){
     var _hitT=frame===0?0:Math.sin((frame/4)*Math.PI);
     if(_hitT>0.3){
@@ -5337,44 +5387,87 @@ function buildingIconImg(race,kind,towerUpgrade){return '<img src="'+getBuilding
   if(TOOL_ICONS[key]) return TOOL_ICONS[key];
   var c=document.createElement('canvas');c.width=size;c.height=size;
   var ctx=c.getContext('2d');
-  // ПАТЧ #3: фоновая плашка, тень, три чётких рабочих
+
+  // Фон
   var bg=ctx.createLinearGradient(0,0,0,size);
-  bg.addColorStop(0,'#1a2438');bg.addColorStop(1,'#050810');
+  bg.addColorStop(0,'#2a3a52');bg.addColorStop(1,'#0a1018');
   ctx.fillStyle=bg;ctx.fillRect(0,0,size,size);
-  // subtle frame
-  ctx.strokeStyle='rgba(200,160,64,0.35)';ctx.lineWidth=1;
-  ctx.strokeRect(1,1,size-2,size-2);
-  var sp=bakeUnit(race,'worker',0,DIR.DOWN,0);
-  var s=Math.min(size*0.72/sp.width, size*0.72/sp.height);
-  var dw=sp.width*s, dh=sp.height*s;
-  // три рабочих: сзади-центр (большой), спереди-слева, спереди-справа (поменьше)
-  var layouts=[
-    {x:size*0.5, y:size*0.82, sc:1.0},   // центральный
-    {x:size*0.22,y:size*0.78, sc:0.72},  // левый
-    {x:size*0.78,y:size*0.78, sc:0.72}   // правый
+  ctx.strokeStyle='rgba(200,160,64,0.45)';ctx.lineWidth=1;
+  ctx.strokeRect(0.5,0.5,size-1,size-1);
+
+  // Палитра под расу
+  var pal={
+    luminite:{skin:'#f0cfa0',skinD:'#c09068',cloth:'#d8d4c6',cloth2:'#8a8478',trim:'#e6c67a'},
+    gromborn:{skin:'#7a9a52',skinD:'#4a6a28',cloth:'#a08870',cloth2:'#5a4028',trim:'#c05a30'},
+    sylvanid:{skin:'#c8dcb8',skinD:'#8aaa70',cloth:'#b6bf9e',cloth2:'#5a6a40',trim:'#7ac060'}
+  }[race]||{skin:'#f0cfa0',skinD:'#c09068',cloth:'#d8d4c6',cloth2:'#8a8478',trim:'#e6c67a'};
+
+  // Три головы-торса в шахматном порядке, крупно
+  // Позиции: центр-задний (большой), левый-передний, правый-передний (поменьше)
+  var heads=[
+    {x:size*0.50, y:size*0.42, r:size*0.24},  // задний центральный
+    {x:size*0.26, y:size*0.66, r:size*0.20},  // левый передний
+    {x:size*0.74, y:size*0.66, r:size*0.20}   // правый передний
   ];
-  for(var i=0;i<layouts.length;i++){
-    var L=layouts[i];
-    var _w=dw*L.sc,_h=dh*L.sc;
-    ctx.save();
-    // тень под каждым
-    ctx.fillStyle='rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(L.x,L.y+_h*0.02,_w*0.28,_h*0.06,0,0,TAU);
-    ctx.fill();
-    ctx.drawImage(sp, L.x-_w/2, L.y-_h, _w, _h);
-    ctx.restore();
+
+  // Рисуем от дальнего к ближнему
+  var order=[0,1,2];
+  for(var oi=0;oi<order.length;oi++){
+    var h=heads[order[oi]];
+    var scale=h.r/(size*0.20); // относительный масштаб
+    // Плечи
+    ctx.fillStyle=pal.cloth;
+    roundRect(ctx,h.x-h.r*1.35,h.y+h.r*0.55,h.r*2.7,h.r*1.55,h.r*0.35);ctx.fill();
+    ctx.strokeStyle='#1a2010';ctx.lineWidth=Math.max(1,size*0.02);ctx.stroke();
+    // Воротник / отделка
+    ctx.fillStyle=pal.trim;
+    ctx.fillRect(h.x-h.r*0.9,h.y+h.r*0.58,h.r*1.8,h.r*0.20);
+    // Шея
+    ctx.fillStyle=pal.skinD;
+    ctx.fillRect(h.x-h.r*0.28,h.y+h.r*0.35,h.r*0.56,h.r*0.35);
+    // Голова
+    var hg=ctx.createRadialGradient(h.x-h.r*0.3,h.y-h.r*0.3,h.r*0.1,h.x,h.y,h.r);
+    hg.addColorStop(0,pal.skin);hg.addColorStop(0.75,pal.skinD);hg.addColorStop(1,shade(pal.skinD,-0.3));
+    ctx.fillStyle=hg;
+    ctx.beginPath();ctx.arc(h.x,h.y,h.r,0,TAU);ctx.fill();
+    ctx.strokeStyle='#1a1008';ctx.lineWidth=Math.max(1,size*0.018);ctx.stroke();
+    // Волосы / шлем / капюшон — по расе
+    if(race==='luminite'){
+      // каска
+      var hg2=ctx.createLinearGradient(h.x,h.y-h.r*1.2,h.x,h.y+h.r*0.3);
+      hg2.addColorStop(0,'#e8eef4');hg2.addColorStop(0.6,'#b8c4cc');hg2.addColorStop(1,'#6a7a88');
+      ctx.fillStyle=hg2;
+      ctx.beginPath();ctx.arc(h.x,h.y-h.r*0.1,h.r*1.03,Math.PI,TAU,false);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#3a4a58';ctx.lineWidth=Math.max(1,size*0.015);ctx.stroke();
+    } else if(race==='gromborn'){
+      // тёмные волосы
+      ctx.fillStyle='#2a1a08';
+      ctx.beginPath();ctx.arc(h.x,h.y-h.r*0.15,h.r*1.02,Math.PI,TAU,false);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#0a0504';ctx.lineWidth=Math.max(1,size*0.015);ctx.stroke();
+    } else {
+      // капюшон-лист
+      ctx.fillStyle='#3a7a30';
+      ctx.beginPath();ctx.arc(h.x,h.y-h.r*0.15,h.r*1.05,Math.PI,TAU,false);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#0a2a10';ctx.lineWidth=Math.max(1,size*0.015);ctx.stroke();
+    }
+    // Глаза
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(h.x-h.r*0.35,h.y+h.r*0.05,h.r*0.16,0,TAU);ctx.arc(h.x+h.r*0.35,h.y+h.r*0.05,h.r*0.16,0,TAU);ctx.fill();
+    ctx.fillStyle='#1a1008';
+    ctx.beginPath();ctx.arc(h.x-h.r*0.35,h.y+h.r*0.05,h.r*0.08,0,TAU);ctx.arc(h.x+h.r*0.35,h.y+h.r*0.05,h.r*0.08,0,TAU);ctx.fill();
   }
-  // бейдж «×3»
+
+  // Бейдж «×3»
   ctx.save();
   ctx.fillStyle='rgba(230,198,122,0.95)';
   ctx.strokeStyle='#3a2010';ctx.lineWidth=1.2;
-  roundRect(ctx, size-17, size-13, 15, 11, 2);
+  roundRect(ctx,size-17,size-13,15,11,2);
   ctx.fill();ctx.stroke();
   ctx.fillStyle='#2a1808';
   ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('×3', size-9.5, size-7.5);
+  ctx.fillText('×3',size-9.5,size-7.5);
   ctx.restore();
+
   var url=c.toDataURL();TOOL_ICONS[key]=url;return url;
 }
 
@@ -7621,13 +7714,22 @@ if(u._healTimer<=0){
     if(this.auraCache.manaRegen&&this.auraCache.manaRegen[u.id]) manaRate*=1.15;
     u.mana=Math.min(u.maxMana,u.mana+manaRate*dt);
   }
-  // ПАТЧ #9: крутим колёса по реальному смещению
-var _wDx=u.x-u._prevX, _wDy=u.y-u._prevY;
-var _wDisp2=_wDx*_wDx+_wDy*_wDy;
-if(u.role==='siege' && (u.moving || _wDisp2>0.5)){
-  var _wSpeed=u.moving?u.spd:Math.sqrt(_wDisp2)/Math.max(dt,0.001);
-  u.wheelRot+=(_wSpeed*dt)/(14*1)+dt*2;
+    // ПАТЧ 8: колёса крутятся ВСЕГДА, пока юнит движется
+if(u.role==='siege'){
+  var _wSpeed=0;
+  if(u.moving) _wSpeed=u.spd;
+  else {
+    // fallback: считаем по фактическому смещению за прошлый кадр
+    var _wDx=u.x-(u._prevXLast||u.x);
+    var _wDy=u.y-(u._prevYLast||u.y);
+    var _wDisp=Math.hypot(_wDx,_wDy);
+    if(_wDisp>0.2) _wSpeed=_wDisp/Math.max(dt,0.001);
+  }
+  if(_wSpeed>0){
+    u.wheelRot=(u.wheelRot||0)+_wSpeed*dt/11;
+  }
 }
+u._prevXLast=u.x;u._prevYLast=u.y;
   if(u.moving && !u.dying && !u._insideMine){
     u._stuckCheckTimer=(u._stuckCheckTimer||0)+dt;
     if(u._stuckCheckTimer>=1.2){
@@ -8147,8 +8249,14 @@ Game.prototype.updateBuilding=function(b,dt){
             b.queue.shift();
             if(b.owner==='player') this.notify('Ратуша ур.'+_thNowC1+' — '+uName(q.race||b.race,q.role)+' требует ур.'+_thReqC1+'. Ресурсы возвращены');
           } else {
-          var spawnR=b.radius+70;
-          var spawnAng=Math.random()*TAU;
+                    var spawnR=b.radius+70;
+          // ПАТЧ 3: спавн в сторону точки сбора — юнит сразу пойдёт прямой дорогой
+          var spawnAng;
+          if(b.rallyPoint){
+            spawnAng=Math.atan2(b.rallyPoint.y-b.y,b.rallyPoint.x-b.x);
+          } else {
+            spawnAng=Math.random()*TAU;
+          }
           var sx=cl(b.x+Math.cos(spawnAng)*spawnR,30,this.W-30);
           var sy=cl(b.y+Math.sin(spawnAng)*spawnR,30,this.H-30);
           for(var attempt=0;attempt<6;attempt++){
@@ -8159,7 +8267,12 @@ Game.prototype.updateBuilding=function(b,dt){
               if(Math.hypot(ob.x-sx,ob.y-sy)<ob.radius+55){tooClose=true;break;}
             }
             if(!tooClose) break;
-            spawnAng+=(attempt+1)*0.7;
+            // Если есть ралли и точка занята — смещаемся на ±0.7 радиана от направления на ралли
+            if(b.rallyPoint){
+              spawnAng+= (attempt%2===0?1:-1) * 0.7;
+            } else {
+              spawnAng+=(attempt+1)*0.7;
+            }
             sx=cl(b.x+Math.cos(spawnAng)*spawnR,30,this.W-30);
             sy=cl(b.y+Math.sin(spawnAng)*spawnR,30,this.H-30);
           }
@@ -8170,9 +8283,16 @@ Game.prototype.updateBuilding=function(b,dt){
           u2.owner=b.owner;u2.pid=b.pid;u2.spawnT=0;
           u2.role=def.role;
           if(q.role==='hero'&&q.heroType) u2.heroType=q.heroType;
-                    if(b.rallyPoint){
+          if(b.rallyPoint){
             u2.moveTo={x:b.rallyPoint.x,y:b.rallyPoint.y};
-            u2._path=null;u2._pathIdx=0;u2._lastMoveTo=null;
+            // ПАТЧ 3: если линия от спавна до ралли свободна — назначаем прямой отрезок.
+            if(this._hasClearPath(u2.x,u2.y,b.rallyPoint.x,b.rallyPoint.y,u2.radius+3)){
+              u2._path=[{x:b.rallyPoint.x,y:b.rallyPoint.y}];
+              u2._pathIdx=0;
+            } else {
+              u2._path=null;u2._pathIdx=0;
+            }
+            u2._lastMoveTo={x:b.rallyPoint.x,y:b.rallyPoint.y};
             u2.attackMoveTo=null;u2.target=null;u2.stationed=false;
           }
           this.units.push(u2);
@@ -10141,26 +10261,30 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
     if(d2r<rrR*rrR&&d2r<bestRD){bestRD=d2r;bestR=r2;}
   }
     if(bestR){
-    // ПАТЧ: используем countGatherers — ту же логику, что и в doGather,
-    // иначе игрок может получить "шахта занята" когда есть свободный слот
     var currentGatherers=0;
-    if(bestR.kind==='gold') currentGatherers = this.countGatherers(bestR);
+    if(bestR.kind==='gold'){
+      // Считаем ТОЛЬКО тех, кто уже на шахте и НЕ в текущем выделении.
+      // Это фиксит баг «шахта занята 3/5» при повторной отправке тех же рабочих.
+      for(var _ci=0;_ci<this.units.length;_ci++){
+        var _cu=this.units[_ci];
+        if(_cu.dying||_cu.gatherTarget!==bestR) continue;
+        if(_cu._waitingForMine) continue;
+        if(sel.indexOf(_cu)>=0) continue;
+        currentGatherers++;
+      }
+    }
     for(wi=0;wi<sel.length;wi++){
       var u2=sel[wi];
       if(u2.role==='worker'){
         u2.target=null;u2.lockedTarget=null;u2.moveTo=null;u2.buildTarget=null;u2.repairTarget=null;u2.demolishTarget=null;u2.carrying=null;u2.carryAmt=0;u2.gatherProgress=0;u2.gatherAnimT=0;u2._stuckTimer=0;u2._insideMine=false;u2._mineSlot=-1;u2._waitingForMine=false;u2._path=null;u2._pathIdx=0;
-       
-        
+
         if(bestR.kind==='gold'&&currentGatherers>=MAX_GATHER_PER_MINE){
-  u2.gatherTarget=null; u2._assignedMine=null; u2.moveTo=null; u2._path=null; u2._pathIdx=0;
-  this.notify(t_('mineFull'));
-} else {
-  u2.gatherTarget=bestR;
-  if(bestR.kind==='gold'){ u2._assignedMine=bestR; currentGatherers++; }
-}
-
-
-        
+          u2.gatherTarget=null; u2._assignedMine=null; u2.moveTo=null; u2._path=null; u2._pathIdx=0;
+          this.notify(t_('mineFull'));
+        } else {
+          u2.gatherTarget=bestR;
+          if(bestR.kind==='gold'){ u2._assignedMine=bestR; currentGatherers++; }
+        }
       } else { u2.moveTo={x:wx,y:wy}; u2.target=null; u2.lockedTarget=null; u2._path=null; u2._pathIdx=0; }
     }
     Audio.sfx('click');return;
@@ -11194,6 +11318,11 @@ AIController.prototype.tryBuild=function(){
   }
   var totalBuildings=mine.length;
   if(totalBuildings>=MAX_BOT_BUILDINGS) return;
+  // ПАТЧ: не спамить недостроенными TH и barracks — если уже есть недостройка того же типа, ждём
+var _buildingInProgress={};
+for(var _bip=0;_bip<mine.length;_bip++){
+  if(!mine[_bip].completed) _buildingInProgress[mine[_bip].kind]=true;
+}
 
 // Если бота атакуют — строим башни (до 4 штук)
   if(this._underHeavyAttack || this.underAttack){
@@ -11247,7 +11376,9 @@ AIController.prototype.tryBuild=function(){
     }
   }
   
-  if(!th){
+    if(!th){
+    // ПАТЧ 12: если TH уже строится — второй не начинаем
+    if(_buildingInProgress.townhall) return;
     var thDef0=this.race.buildings.townhall;
     if(res.gold<thDef0.gold||res.wood<thDef0.wood) return;
     var w0=null;
@@ -11280,17 +11411,18 @@ for(var _wi=0;_wi<g.units.length;_wi++){
   if(_wu.pid===this.pid && _wu.role==='worker' && !_wu.dying && _wu.gatherTarget && _wu.gatherTarget.kind==='tree') _curWoodWorkers++;
 }
 
-for(var oi=0;oi<order.length;oi++){
+  for(var oi=0;oi<order.length;oi++){
   var k=order[oi];
   if(_unlocked.indexOf(k)<0) continue;
-  
+  if(_buildingInProgress[k]) continue;   // ПАТЧ 12: уже строим этот тип — ждём
+
   // Умные лесопилки
   if(k==='lumber'){
     var _lumberCount = builtCount.lumber || 0;
     // Если 1 лесопилка уже есть, строим вторую ТОЛЬКО если рабочих на дереве > 6
     if(_lumberCount >= 1 && (_lumberCount >= 2 || _curWoodWorkers <= 6)) continue;
   }
-  
+
   // Ограничение казарм по TH
   if(k==='barracks'){
     var _maxBrk = (g.getTHLevel(this.pid) === 1) ? 1 : (g.getTHLevel(this.pid) === 2) ? 2 : 3;
@@ -12486,10 +12618,15 @@ AIController.prototype.healAlliesOutOfCombat=function(){
     }
     if(!found) return;
   }
-  for(var _chkI=0;_chkI<g.buildings.length;_chkI++){
+    for(var _chkI=0;_chkI<g.buildings.length;_chkI++){
     var _chkB=g.buildings[_chkI];
     if(_chkB.dead||_chkB.pid!==this.pid||_chkB.kind!=='townhall') continue;
     if(Math.hypot(_chkB.x-tx,_chkB.y-ty)<700) return;
+  }
+  // ПАТЧ 12: не расширяемся, если уже есть строящийся TH
+  for(var _thExpI=0;_thExpI<g.buildings.length;_thExpI++){
+    var _thExpB=g.buildings[_thExpI];
+    if(_thExpB.pid===this.pid && _thExpB.kind==='townhall' && !_thExpB.completed && !_thExpB.dead) return;
   }
       var w=null;
   // 1. Ищем свободного
@@ -12886,8 +13023,9 @@ AIController.prototype.getEnemyComposition=function(){
     var drawY=p.y-sp.height*s*0.94-bob;
   // ПАТЧ 3.2: Функция для рисования рук и оружия
   var _self=this;
-  var _drawArmsWeapon=function(){
+    var _drawArmsWeapon=function(){
     if(u.role==='cav'||u.role==='siege'||u.role==='fly'||_isVariantHero) return;
+    if(u.dir===DIR.UP) return;   // ПАТЧ 10: не рисуем руки поверх спины — оружие уже в спрайте
     _self._arms(u,p,s,flipX);
     if(u._handScreenX!==null && u._handScreenX!==undefined){
       var _a2=Math.max(0,Math.min(1,u.attackT||0)),_c2=Math.max(0,Math.min(1,u.chopT||0)),_k2=Math.max(0,Math.min(1,u.castT||0));
@@ -12897,11 +13035,10 @@ AIController.prototype.getEnemyComposition=function(){
       ctx.restore();
     }
   };
-  // При ходьбе вверх руки и оружие рисуются ДО спрайта (за спиной)
-  if(u.dir===DIR.UP) _drawArmsWeapon();
+    // ПАТЧ 10: удалён вызов `if(u.dir===DIR.UP) _drawArmsWeapon();` — при UP руки не рисуем вовсе
   if(flipX){ctx.save();ctx.translate(p.x,0);ctx.scale(-1,1);ctx.drawImage(sp,-sp.width*s/2,drawY,sp.width*s,sp.height*s);ctx.restore();}
   else ctx.drawImage(sp,p.x-sp.width*s/2,drawY,sp.width*s,sp.height*s);
-  if(u.role==='siege'&&!u.dying){
+    if(u.role==='siege'&&!u.dying){
     var spY2=p.y-sp.height*s*0.94-bob;
     var wy2=spY2+sp.height*s*0.86;
     var wheelRot=(u.wheelRot||0);
@@ -12923,8 +13060,8 @@ AIController.prototype.getEnemyComposition=function(){
           var sa=rotA+ss/8*TAU;
           ctx.beginPath();
           ctx.moveTo(cx2+Math.cos(sa)*r*0.95,cy2+Math.sin(sa)*r*0.95);
-          ctx.lineTo(cx2+Math.cos(sa)*r*1.15,cy2+Math.sin(sa)*r*1.15);
-          ctx.lineTo(cx2+Math.cos(sa+0.15)*r*0.95,cy2+Math.sin(sa+0.15)*r*0.95);
+          ctx.lineTo(cx2+Math.cos(sa)*r*1.18,cy2+Math.sin(sa)*r*1.18);
+          ctx.lineTo(cx2+Math.cos(sa+0.18)*r*0.95,cy2+Math.sin(sa+0.18)*r*0.95);
           ctx.closePath();ctx.fill();
         }
       };
@@ -12941,8 +13078,17 @@ AIController.prototype.getEnemyComposition=function(){
         ctx.fillStyle='#c8a878';ctx.beginPath();ctx.arc(cx2,cy2,r*0.28,0,TAU);ctx.fill();
         ctx.strokeStyle='#3a2010';ctx.lineWidth=1.2*s;ctx.stroke();
         ctx.strokeStyle='#a07840';ctx.lineWidth=2*s;ctx.beginPath();ctx.arc(cx2,cy2,r*0.9,0,TAU);ctx.stroke();
+        // ПАТЧ 8: добавили тёмные засечки на ободе — вращение видно отчётливей
+        ctx.strokeStyle='#1a0804';ctx.lineWidth=1.4*s;
+        for(var k2=0;k2<12;k2++){
+          var a2=rotA+k2/12*TAU;
+          ctx.beginPath();
+          ctx.moveTo(cx2+Math.cos(a2)*r*0.78,cy2+Math.sin(a2)*r*0.78);
+          ctx.lineTo(cx2+Math.cos(a2)*r,cy2+Math.sin(a2)*r);
+          ctx.stroke();
+        }
       };
-            drawWoodWheelRt(wc1,wy2,wR3,wheelRot);
+      drawWoodWheelRt(wc1,wy2,wR3,wheelRot);
       drawWoodWheelRt(wc2,wy2,wR3,wheelRot);
     }
   }
@@ -14039,15 +14185,17 @@ UISys.prototype._showWc3Tooltip=function(btn,text){
       descHtml=descHtml.replace(re,function(m,pre,word,num){return pre+word+' '+num+_mk(key);});
     };
     _repl(/(^|[\s.,;:!?«»"()])(HP|Здоровье|Health)\s+(\d+(?:\/[\d]+)?)/gi,'hp');
-    _repl(/(^|[\s.,;:?«»"()])(Урон|Damage|Атака|Attack)\s+(\d+)/gi,'weapon_melee');
+    _repl(/(^|[\s.,;:?«»"()])(Урон|Damage|Атака|Attack|дамаг)\s+(\d+)/gi,'weapon_melee');
     _repl(/(^|[\s.,;:?«»"()])(Броня|Armor)\s+([\d.]+)/gi,'shield');
-    _repl(/(^|[\s.,;:?«»"()])(Дальность|Range|Радиус)\s+(\d+)/gi,'range');
+    _repl(/(^|[\s.,;:?«»"()])(Дальность|Range|Радиус|Radius)\s+(\d+)/gi,'range');
     _repl(/(^|[\s.,;:?«»"()])(Скорость|Speed)\s+(\d+)/gi,'speed');
     _repl(/(^|[\s.,;:?«»"()])(Золото|Gold)\s+(\d+)/gi,'gold');
     _repl(/(^|[\s.,;:?«»"()])(Дерево|Wood)\s+(\d+)/gi,'wood');
     _repl(/(^|[\s.,;:?«»"()])(Еда|Food)\s+(\d+)/gi,'meat');
     _repl(/(^|[\s.,;:?«»"()])(Время|Time)\s+(\d+)/gi,'time');
     _repl(/(^|[\s.,;:?«»"()])(Мана|Mana)\s+(\d+)/gi,'mana');
+    _repl(/(^|[\s.,;:?«»"()])(КД|Кулдаун|Cooldown|CD)\s*:?\s*(\d+)\s*с?/gi,'time');
+    _repl(/(^|[\s.,;:?«»"()])(\+)?(\d+)% к урону/gi,'weapon_melee');
     html+='<div class="tt-desc">'+descHtml+'</div>';
   }
     btn._cachedTip=text;
@@ -14423,7 +14571,13 @@ UISys.prototype.refreshSelection=function(){
   this.$('cmdpanel').classList.add('show');info.classList.add('show');
   if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
   else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
-  else{var b2=selB[0];info.textContent=bldName(b2.race,b2.kind)+(b2.completed?' Ур.'+b2.level:' ...')+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;}
+  else{
+  var b2=selB[0];
+  var _bldSt2;
+  if(b2.completed) _bldSt2='Ур.'+b2.level;
+  else _bldSt2='Стройка '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
+  info.textContent=bldName(b2.race,b2.kind)+' '+_bldSt2+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;
+}
   var activeEnt=null;
   for(var _ai=0;_ai<sel.length;_ai++){if(sel[_ai].id===this._activeUnitId){activeEnt=sel[_ai];break;}}
   this.drawPortrait(activeEnt||sel[0]||selB[0]);
@@ -14472,7 +14626,13 @@ UISys.prototype.refreshInfoOnly=function(){
   var info=this.$('selinfo');
   if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
   else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
-  else{var b2=selB[0];info.textContent=bldName(b2.race,b2.kind)+(b2.completed?' Ур.'+b2.level:' ...')+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;}
+  else{
+  var b2=selB[0];
+  var _bldSt3;
+  if(b2.completed) _bldSt3='Ур.'+b2.level;
+  else _bldSt3='Стройка '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
+  info.textContent=bldName(b2.race,b2.kind)+' '+_bldSt3+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;
+}
 };
 UISys.prototype.refreshUnitBar=function(){
   var bar=this.$('unit-bar');if(!bar) return;
@@ -14509,8 +14669,16 @@ UISys.prototype.refreshUnitBar=function(){
         if(u2.isHero) iconSrc=getUnitIconURL(u2.race,'hero',u2.heroType);
         else iconSrc=getUnitIconURL(u2.race,u2.role);
         var hpPct=Math.max(0,Math.min(100,Math.round(u2.hp/u2.maxHp*100)));
-        var hpCol=hpPct>50?'#3aa03a':hpPct>25?'#c0a030':'#c02020';
-        btn.innerHTML='<img src="'+iconSrc+'" alt=""><div class="hp-bar"><div class="hp-fill" style="width:'+hpPct+'%;background:'+hpCol+'"></div></div>';
+var hpCol=hpPct>50?'#3aa03a':hpPct>25?'#c0a030':'#c02020';
+var _mpPct=u2.maxMana>0?Math.max(0,Math.min(100,Math.round((u2.mana||0)/u2.maxMana*100))):0;
+var _hpTxt=Math.ceil(u2.hp);
+var _mpTxt=u2.maxMana>0?Math.floor(u2.mana||0):null;
+btn.innerHTML=
+  '<img src="'+iconSrc+'" alt="">'
+  +'<div style="position:absolute;top:0;left:1px;font-size:8px;font-weight:800;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 2px #000;pointer-events:none;z-index:2">'+_hpTxt+'</div>'
+  +(_mpTxt!==null?'<div style="position:absolute;top:11px;left:1px;font-size:8px;font-weight:800;color:#a0d0ff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 2px #000;pointer-events:none;z-index:2">'+_mpTxt+'</div>':'')
+  +'<div class="hp-bar"><div class="hp-fill" style="width:'+hpPct+'%;background:'+hpCol+'"></div></div>'
+  +(_mpTxt!==null?'<div style="position:absolute;bottom:4px;left:0;right:0;height:2px;background:#000;overflow:hidden;z-index:1"><div style="height:100%;width:'+_mpPct+'%;background:#5aa8df;transition:width .15s linear"></div></div>':'');
         btn.onclick=function(e){
           e.stopPropagation();
           var wasActive=(UI._activeUnitId===u2.id);
@@ -14863,10 +15031,12 @@ UISys.prototype._refreshPortraitBars=function(){
   if(disabled) btn.disabled=true;
   if(hotkey) btn.dataset.hotkey=String(hotkey).toLowerCase();
   var html='';
-  if(icon) html+='<div class="ico">'+icon+'</div>';
-  // ПАТЧ #2: подпись клавиши слева от текста
-  var _hk=hotkey?'<span style="display:inline-block;min-width:12px;padding:0 3px;margin-right:3px;background:#0d1420;border:1px solid #557096;border-radius:2px;color:#80ff80;font-weight:800;font-size:8px;line-height:11px;text-align:center;vertical-align:middle">'+hotkey+'</span>':'';
-  html+='<div class="lbl">'+_hk+label+'</div>';
+if(icon) html+='<div class="ico">'+icon+'</div>';
+// На мобильных полностью убираем PC-хоткеи (буква в квадратике + префикс [X] в label)
+var _isMobileUI=!!Settings._isMobile;
+var _hk=(hotkey && !_isMobileUI)?'<span style="display:inline-block;min-width:12px;padding:0 3px;margin-right:3px;background:#0d1420;border:1px solid #557096;border-radius:2px;color:#80ff80;font-weight:800;font-size:8px;line-height:11px;text-align:center;vertical-align:middle">'+hotkey+'</span>':'';
+var _label=_isMobileUI?String(label).replace(/^\[[A-ZА-Я]\]\s*/,''):label;
+html+='<div class="lbl">'+_hk+_label+'</div>';
   if(price) html+='<div class="price">'+price+'</div>';
   btn.innerHTML=html;
   btn.onclick=function(){if(disabled) return;Audio.sfx('click');fn();};
@@ -15284,8 +15454,8 @@ UISys.prototype.renderActions=function(force){
         }
         if(canLvlUp) label+=' +';
         var price='';
-        if(cd>0) price+=Math.ceil(cd)+'с';
-        if(!isPassive) price+= (price?' ':'')+(ab.mana||35)+'маны';
+        if(cd>0) price+='<div style="display:inline-flex;align-items:center;gap:1px">'+toolIconImg('time')+Math.ceil(cd)+'с</div>';
+if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1px">'+toolIconImg('mana')+(ab.mana||35)+'</div>';
         var iconName=ab.id;
         if(iconName==='divine_shield') iconName='shield';
         if(iconName==='forest_wrath') iconName='forest';
@@ -15391,14 +15561,19 @@ UISys.prototype.renderActions=function(force){
 else if(sel.length){
   var workers=[],fighters=[];
   for(i=0;i<sel.length;i++){if(sel[i].role==='worker') workers.push(sel[i]);else fighters.push(sel[i]);}
-  if(workers.length){
+    if(workers.length){
     var race=null;for(i=0;i<g.config.slots.length;i++){var s=g.config.slots[i];if(s.type==='player'&&i===g.playerPid){race=s.race;break;}}
-    if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();});
+    var _wk_keys=Settings.keys||DEFAULT_KEYS;
+    var _hkB=(_wk_keys.build||'b').toUpperCase();
+    var _hkG=(_wk_keys.toMine||'g').toUpperCase();
+    var _hkL=(_wk_keys.toWood||'l').toUpperCase();
+    var _hkR=(_wk_keys.repair||'r').toUpperCase();
+    if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();},false,false,'Построить здание',undefined,_hkB);
     this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
       var assigned=0;
       for(var wi=0;wi<workers.length;wi++){
         var wk=workers[wi];
-        var mine=g.findVisibleResourceForWorker(wk,'gold',900);
+        var mine=g.findVisibleResourceForWorker(wk,'gold',1600);
         if(mine){
           wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
           wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
@@ -15411,12 +15586,12 @@ else if(sel.length){
       }
       if(!assigned) g.notify(t_('noResNearby'));
       else Audio.sfx('click');
-    });
+    },false,false,'Добывать золото',undefined,_hkG);
     this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
       var assigned=0;
       for(var wi=0;wi<workers.length;wi++){
         var wk=workers[wi];
-        var tree=g.findVisibleResourceForWorker(wk,'tree',900);
+        var tree=g.findVisibleResourceForWorker(wk,'tree',1600);
         if(tree){
           wk.gatherTarget=tree;wk._assignedMine=null;wk.carrying=null;wk.carryAmt=0;
           wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
@@ -15429,7 +15604,7 @@ else if(sel.length){
       }
       if(!assigned) g.notify(t_('noResNearby'));
       else Audio.sfx('click');
-    });
+    },false,false,'Рубить деревья',undefined,_hkL);
     var hasUnfinished=false;
     for(i=0;i<g.buildings.length;i++){var bu=g.buildings[i];if(bu.pid===g.playerPid&&!bu.completed&&!bu.dead){hasUnfinished=true;break;}}
     if(hasUnfinished){
@@ -15457,7 +15632,7 @@ else if(sel.length){
           wk3.stationed=false;
         }
         Audio.sfx('repair');
-      },false,false,repairTip);
+      },false,false,repairTip,undefined,_hkR);
     }
     this.addAction(box,'<img src="'+getWorkersIconURL(race)+'" alt="">',t_('workersAll'),null,function(){g.selectWorkers();});
   }
@@ -15831,9 +16006,9 @@ else if(sel.length){
     var priceEl=_btn.querySelector('.price');
     if(priceEl){
       var newPrice='';
-      if(cd>0) newPrice+=Math.ceil(cd)+'с';
-      if(!isPassive) newPrice+=(newPrice?' ':'')+(ab.mana||35)+'маны';
-      if(priceEl.textContent!==newPrice) priceEl.textContent=newPrice;
+if(cd>0) newPrice+='<div style="display:inline-flex;align-items:center;gap:1px">'+toolIconImg('time')+Math.ceil(cd)+'с</div>';
+if(!isPassive) newPrice+='<div style="display:inline-flex;align-items:center;gap:1px">'+toolIconImg('mana')+(ab.mana||35)+'</div>';
+if(priceEl.innerHTML!==newPrice) priceEl.innerHTML=newPrice;
     }
     var wantDis=(!(canLvlUp||canUse))||(_stunnedHero&&!isPassive&&lvl>0);
     if(wantDis!==_btn.disabled){_btn.disabled=wantDis;}
