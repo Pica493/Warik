@@ -13934,10 +13934,19 @@ for(i=0;i<g.bolts.length;i++){
   this.bindAll();this.buildMapList();this.loadSettingsUI();
   this.initTopIcons();
   Settings._isMobile=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||('ontouchstart' in window&&Math.min(window.innerWidth,window.innerHeight)<900);
-  if(Settings._isMobile){
+    if(Settings._isMobile){
     var rowEdge=this.$('row-edge');if(rowEdge) rowEdge.style.display='none';
     Settings.edgeScroll=0;
   }
+  // ПАТЧ C-fix: пересчёт _isMobile при resize (планшет / сужение окна на ПК)
+  var _self=this;
+  window.addEventListener('resize',function(){
+    var _wasMobile=Settings._isMobile;
+    Settings._isMobile=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||('ontouchstart' in window&&Math.min(window.innerWidth,window.innerHeight)<900);
+    if(Settings._isMobile!==_wasMobile){
+      _self._lastActionsHash='';
+    }
+  });
 }
 UISys.prototype.$=function(id){return document.getElementById(id);};
 UISys.prototype.initTopIcons=function(){
@@ -15120,12 +15129,12 @@ UISys.prototype.getActionsHash=function(){
   if(!Game_) return '';
   var g=Game_,parts=[];
   var _hasSel=false;
-  var _addRes=function(){if(_hasSel)return;_hasSel=true;var _r=g.getRes(g.playerPid);parts.push('r|'+Math.floor(_r.gold/10)+'|'+Math.floor(_r.wood/10)+'|'+_r.food+'|'+_r.maxFood);};
+    var _addRes=function(){if(_hasSel)return;_hasSel=true;var _r=g.getRes(g.playerPid);parts.push('r|'+Math.floor(_r.gold)+'|'+Math.floor(_r.wood)+'|'+_r.food+'|'+_r.maxFood);};
   for(var i=0;i<g.units.length;i++){
     var u=g.units[i];
     if(u.sel&&u.pid===g.playerPid&&!u.dying){
       _addRes();
-      parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+(u.ultUnlocked?1:0)+'|'+(u.isHero?('L'+JSON.stringify(u.abilityLevels||{})):''));
+           parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+(u.ultUnlocked?1:0)+'|'+(u.isHero?('L'+JSON.stringify(u.abilityLevels||{})+'M'+Math.floor(u.mana||0)+'C'+Math.floor((u.cdA1||0)+(u.cdA2||0)+(u.cdA3||0)+(u.cdUlt||0))):''));
     }
   }
   for(var bi=0;bi<g.buildings.length;bi++){
@@ -15648,12 +15657,12 @@ else if(sel.length){
     },false,false,'Рубить деревья',undefined,_hkL);
     var hasUnfinished=false;
     for(i=0;i<g.buildings.length;i++){var bu=g.buildings[i];if(bu.pid===g.playerPid&&!bu.completed&&!bu.dead){hasUnfinished=true;break;}}
-    if(hasUnfinished){
+        if(hasUnfinished){
       this.addAction(box,toolIconImg('finishBuild'),t_('finishBuild'),null,function(){
         var target=null,bd=Infinity;
         for(var bi2=0;bi2<g.buildings.length;bi2++){var bb=g.buildings[bi2];if(bb.pid!==g.playerPid||bb.completed||bb.dead) continue;var d=(bb.x-workers[0].x)*(bb.x-workers[0].x)+(bb.y-workers[0].y)*(bb.y-workers[0].y);if(d<bd){bd=d;target=bb;}}
         if(target){for(var wi=0;wi<workers.length;wi++){var wk=workers[wi];wk.buildTarget=target;wk.gatherTarget=null;wk.moveTo=null;wk.repairTarget=null;wk.demolishTarget=null;wk.carrying=null;wk.carryAmt=0;wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;wk._path=null;wk._pathIdx=0;wk.stationed=false;}Audio.sfx('build');}
-      });
+      },false,false,null,undefined,'F');
     }
     var damaged=null,damDist=Infinity;
     for(i=0;i<g.buildings.length;i++){
@@ -15727,11 +15736,11 @@ else if(sel.length){
     if(b2.completed&&b2.kind==='townhall'){
       var lvl=b2.level||1;
       var thBusyTrain=(b2.queue&&b2.queue.length>0);
-      if(lvl<3&&!b2.upgrading){
+            if(lvl<3&&!b2.upgrading){
         var cost=TH_UPG[lvl],res=g.getRes(g.playerPid);
         var can=(res.gold>=cost.gold&&res.wood>=cost.wood)&&!thBusyTrain;
         var thTip=thBusyTrain?'Нельзя улучшать, пока идёт найм рабочих':'Улучшить до ур.'+(lvl+1);
-        this.addAction(box,toolIconImg('upgrade'),t_('upgrade')+' '+lvl+'→'+(lvl+1),self.costStr(cost.gold,cost.wood),function(){self.upgradeTH(b2);},false,!can,thTip);
+        this.addAction(box,toolIconImg('upgrade'),t_('upgrade')+' '+lvl+'→'+(lvl+1),self.costStr(cost.gold,cost.wood),function(){self.upgradeTH(b2);},false,!can,thTip,undefined,'U');
       }
       var wdef=RACES[b2.race].units.worker;
       var wprice=self.costStr(wdef.gold,wdef.wood)+self.foodStr('worker');
@@ -15744,8 +15753,8 @@ else if(sel.length){
   +'\nЕда: '+(FOOD_COST.worker||1)
   +'\nВремя: '+wdef.time+'с'
   +'\n'+t_('u_worker_desc');
-      var trainBlocked=!!b2.upgrading;
-      this.addAction(box,unitIconImg(b2.race,'worker'),uName(b2.race,'worker'),wprice,function(){self.queueUnit(b2,'worker');},false,trainBlocked,trainBlocked?'Идёт улучшение ратуши':wtip);
+            var trainBlocked=!!b2.upgrading;
+      this.addAction(box,unitIconImg(b2.race,'worker'),uName(b2.race,'worker'),wprice,function(){self.queueUnit(b2,'worker');},false,trainBlocked,trainBlocked?'Идёт улучшение ратуши':wtip,undefined,'W');
     } else if(b2.completed){
       var thLvl=g.getTHLevel(g.playerPid),roles=[];
       var keys=Object.keys(UNIT_UNLOCK);
@@ -15784,11 +15793,15 @@ else if(sel.length){
         box.appendChild(upHdr);
         var roleIcons={melee:'weapon_melee',ranged:'weapon_ranged',spear:'weapon_spear',cav:'weapon_cav',elite:'weapon_elite'};
         var armorIcons={melee:'armor_melee',ranged:'armor_ranged',spear:'armor_spear',cav:'armor_cav',elite:'armor_elite'};
+                var _wKeys={melee:'Q',ranged:'W',spear:'E',cav:'R'};
+        var _aKeys={melee:'Y',ranged:'U',spear:'I',cav:'O'};
         for(var ui2=0;ui2<UPGRADE_ROLES.length;ui2++){
           (function(role){
             var up=g.getUnitUpgrades(g.playerPid,role),rdef=RACES[b2.race].units[role];if(!rdef) return;
             var rName=uName(b2.race,role);
             var res2=g.getRes(g.playerPid);
+            var _wHot=_wKeys[role]||undefined;
+            var _aHot=_aKeys[role]||undefined;
             if(up.w<3){
               var cw=UPGRADE_COST[up.w];
               var canW=res2.gold>=cw.gold && res2.wood>=cw.wood && !busyForge && !forgeQueueBusy;
@@ -15796,9 +15809,9 @@ else if(sel.length){
               var tipW=t_('wUpgTip').replace('{cur}',curW).replace('{next}',nextW).replace('{roles}',rName);
               if(forgeQueueBusy) tipW='Идёт найм в кузнице — улучшения заблокированы\n\n'+tipW;
               if(busyForge) tipW='Кузница уже улучшается\n\n'+tipW;
-              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' '+up.w+'→'+(up.w+1),self.costStr(cw.gold,cw.wood),function(){self.startForgeUpgrade(b2,role,'w');},false,!canW,tipW);
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' '+up.w+'→'+(up.w+1),self.costStr(cw.gold,cw.wood),function(){self.startForgeUpgrade(b2,role,'w');},false,!canW,tipW,undefined,_wHot);
             } else {
-              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — максимально прокачано.');
+              self.addAction(box,toolIconImg(roleIcons[role]||'weapon_upg'),t_('wUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — максимально прокачано.',undefined,_wHot);
             }
             if(up.a<3){
               var ca=UPGRADE_COST[up.a];
@@ -15807,9 +15820,9 @@ else if(sel.length){
               var tipA=t_('aUpgTip').replace('{cur}',curA).replace('{next}',nextA).replace('{roles}',rName);
               if(forgeQueueBusy) tipA='Идёт найм в кузнице — улучшения заблокированы\n\n'+tipA;
               if(busyForge) tipA='Кузница уже улучшается\n\n'+tipA;
-              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' '+up.a+'→'+(up.a+1),self.costStr(ca.gold,ca.wood),function(){self.startForgeUpgrade(b2,role,'a');},false,!canA,tipA);
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' '+up.a+'→'+(up.a+1),self.costStr(ca.gold,ca.wood),function(){self.startForgeUpgrade(b2,role,'a');},false,!canA,tipA,undefined,_aHot);
             } else {
-              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — броня максимальна.');
+              self.addAction(box,toolIconImg(armorIcons[role]||'armor_upg'),t_('aUpg')+' '+rName+' MAX','',function(){},false,true,rName+' — броня максимальна.',undefined,_aHot);
             }
           })(UPGRADE_ROLES[ui2]);
         }
@@ -15853,7 +15866,7 @@ else if(sel.length){
   +'\nДерево: '+_heroDef.wood
   +'\nВремя: '+_timeR+'с'
   +'\nСпособности и очки сохранятся.';
-                self.addAction(box,unitIconImg(b2.race,'hero',_HT),t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level,_priceR,function(){self.resurrectHero(b2,_HT);},false,!_canR2,_tipR);
+                                self.addAction(box,unitIconImg(b2.race,'hero',_HT),t_('resurrect')+' '+_displayName+' Ур.'+_deadH2.level,_priceR,function(){self.resurrectHero(b2,_HT);},false,!_canR2,_tipR,undefined,'R');
               } else {
                 var _priceH=self.costStr(_heroDef.gold,_heroDef.wood)+self.foodStr('hero');
                 var _tipH=_displayName
@@ -15864,7 +15877,7 @@ else if(sel.length){
   +'\nЗолото: '+_heroDef.gold
   +'\nДерево: '+_heroDef.wood
   +'\nВремя: '+_heroDef.time+'с';
-                self.addAction(box,unitIconImg(b2.race,'hero',_HT),_displayName,_priceH,function(){self.queueUnit(b2,'hero',_HT);},false,false,_tipH);
+                                self.addAction(box,unitIconImg(b2.race,'hero',_HT),_displayName,_priceH,function(){self.queueUnit(b2,'hero',_HT);},false,false,_tipH,undefined,'Q');
               }
             })(_hts[_hti]);
           }
@@ -15890,15 +15903,15 @@ else if(sel.length){
         }
       }
     }
-    if(b2.queue.length>0) this.addAction(box,toolIconImg('cancel'),t_('cancel'),b2.queue.length+'',function(){var qr=b2.queue.shift();if(qr){var rd=RACES[qr.race],qd=rd&&rd.units[qr.role];if(qd) g.addRes(g.playerPid,qd.gold||0,qd.wood||0);}self.renderActions(true);});
+        if(b2.queue.length>0) this.addAction(box,toolIconImg('cancel'),t_('cancel'),b2.queue.length+'',function(){var qr=b2.queue.shift();if(qr){var rd=RACES[qr.race],qd=rd&&rd.units[qr.role];if(qd) g.addRes(g.playerPid,qd.gold||0,qd.wood||0);}self.renderActions(true);},false,false,null,undefined,'V');
     var spawnsUnits=(b2.kind==='townhall'||b2.kind==='barracks'||b2.kind==='magic'||b2.kind==='forge'||b2.kind==='altar');
-    if(spawnsUnits&&b2.completed){
+        if(spawnsUnits&&b2.completed){
       var hasRally=!!b2.rallyPoint;
       this.addAction(box,toolIconImg('patrol'),(hasRally?'✓ ':'')+'Указать точку сбора',null,function(){
         Input.clearPending('rally');
         Input.pendingRallyPoint=b2;
         self.showOrderBar('ПКМ по земле — точка сбора. Esc — отмена.');
-      },hasRally,false,'ЛКМ — задать. ПКМ на здании с точкой — удалить.');
+      },hasRally,false,'ЛКМ — задать. ПКМ на здании с точкой — удалить.',undefined,'T');
     }
     if(b2.kind==='tower'&&b2.completed){
       if(b2._towerUpgrading){
@@ -15914,9 +15927,9 @@ else if(sel.length){
         }
         var _cancelTip='Отменить улучшение башни. Вернёт 50% стоимости';
         if(_tuCancDef) _cancelTip+=' ('+Math.floor(_tuCancDef.cost.gold*0.5)+' зол., '+Math.floor(_tuCancDef.cost.wood*0.5)+' дер.)';
-        this.addAction(box,toolIconImg('cancel'),'Отменить улучшение',_refundPrice,function(){
+                this.addAction(box,toolIconImg('cancel'),'Отменить улучшение',_refundPrice,function(){
           self.cancelTowerUpgrade(b2);
-        },false,false,_cancelTip);
+        },false,false,_cancelTip,undefined,'X');
       } else if(b2.towerUpgrade){
         var tuInfo=TOWER_UPGRADES[b2.race]&&TOWER_UPGRADES[b2.race][b2.towerUpgrade];
         var tuName=tuInfo?(LC==='en'?tuInfo.nameEn:tuInfo.name):b2.towerUpgrade;
@@ -15929,12 +15942,14 @@ else if(sel.length){
         var upgHdr=document.createElement('div');
         upgHdr.className='section-sep';upgHdr.textContent='Улучшение башни (1 из 2, навсегда)';
         box.appendChild(upgHdr);
+                var _towerKeys=['U','I'];
+        var _towerKeyIdx=0;
         for(var upKey in opts){
-          (function(uk,udef){
+          (function(uk,udef,_hk){
             var resU=g.getRes(g.playerPid);
             var canU=resU.gold>=udef.cost.gold&&resU.wood>=udef.cost.wood;
             var nameU=LC==='en'?udef.nameEn:udef.name;
-                                                var statsTxt=nameU;
+            var statsTxt=nameU;
             statsTxt+='\nУрон за выстрел: '+udef.atk+toolIconImg('weapon_melee');
             statsTxt+='\nДальность: '+udef.rng+toolIconImg('range');
             statsTxt+='\nСкорострельность: 1 / '+udef.atkCd+'с'+toolIconImg('time');
@@ -15960,8 +15975,8 @@ else if(sel.length){
               b2._towerUpgradeTotal=udef.time;
               Audio.sfx('upgrade',b2.x,b2.y);
               self.renderActions(true);
-            },false,!canU,statsTxt);
-          })(upKey,opts[upKey]);
+            },false,!canU,statsTxt,undefined,_hk);
+          })(upKey,opts[upKey],_towerKeys[_towerKeyIdx++]);
         }
       }
     }
@@ -15972,7 +15987,7 @@ else if(sel.length){
       } else if(b2.sawmillUpgrading){
         var pctS=Math.round((1-b2.sawmillUpgradeTimeLeft/b2.sawmillUpgradeTotal)*100);
         this.addAction(box,toolIconImg('upgrade'),'Улучшение '+pctS+'%','',function(){},false,true,'Улучшение лесопилки в процессе');
-      } else {
+            } else {
         var costS=SAWMILL_UPG[lvlS];
         var resS=g.getRes(g.playerPid);
         var canS=resS.gold>=costS.gold&&resS.wood>=costS.wood;
@@ -15987,14 +16002,14 @@ else if(sel.length){
           b2.sawmillUpgradeTotal=costS.time;
           Audio.sfx('sawmill_upgrade',b2.x,b2.y);
           self.renderActions(true);
-        },false,!canS,tipS);
+        },false,!canS,tipS,undefined,'U');
       }
     }
-    if(!b2.completed){
+        if(!b2.completed){
       var cancelTip='Отменить постройку. Вернёт полную стоимость ('+b2.costGold+'+'+b2.costWood+'), рабочий освободится.';
-      this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip);
+      this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip,undefined,'C');
     } else if(b2.kind!=='townhall'){
-      this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);});
+      this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);},false,false,null,undefined,'D');
     }
     this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
   }
@@ -16078,6 +16093,19 @@ UISys.prototype.update=function(){
     this._infoTimer=(this._infoTimer||0)+1;
     if(this._infoTimer>=3){this._infoTimer=0;this.refreshInfoOnly();this._refreshPortraitBars();}
     if(!Settings._isMobile && Input.mouseInside) this._showUnitHoverTip();
+        // ПАТЧ B-fix: раз в 0.5с пересоздаём кнопки, чтобы disabled-состояние 
+    // отражало актуальные ресурсы (даже если хеш не изменился).
+    // Не пересоздаём, если мышь над панелью — чтобы не сбить tooltip.
+    this._btnRefreshT=(this._btnRefreshT||0)+1;
+    if(this._btnRefreshT>=30){
+      this._btnRefreshT=0;
+      if(box.dataset.menu!=='build'&&box.dataset.menu!=='placing'){
+        var _hoverActions=false;
+        try{ if(document.querySelector('#actions:hover')) _hoverActions=true; }catch(e){}
+        if(!_hoverActions) this._lastActionsHash='';
+      }
+    }
+
     if(g.gameOver&&!this._gameOverShown){
       this._gameOverShown=true;
       var self=this;
@@ -16525,14 +16553,19 @@ function clearAllCaches(){
       var _hhu=Game_.units[_hhi];
       if(_hhu.sel&&_hhu.pid===Game_.playerPid&&_hhu.isHero&&!_hhu.dying){_hasSelHero=true;break;}
     }
-    if(!_hasSelHero){
+        if(!_hasSelHero){
       var _box=UI.$('actions');
       if(_box){
         var _btns=_box.querySelectorAll('.act-btn[data-hotkey]');
         for(var _hki=0;_hki<_btns.length;_hki++){
-          if(_btns[_hki].dataset.hotkey===k && !_btns[_hki].disabled){
+          if(_btns[_hki].dataset.hotkey===k){
+            // ПАТЧ B-fix: даже если кнопка disabled — не проваливаемся в другие обработчики
             e.preventDefault();
-            _btns[_hki].click();
+            if(!_btns[_hki].disabled){
+              _btns[_hki].click();
+            } else {
+              Audio.sfx('error');
+            }
             return;
           }
         }
