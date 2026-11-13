@@ -15689,14 +15689,11 @@ else if(sel.length){
     if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();},false,false,'Построить здание',undefined,_hkB);
         this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
   var assigned=0;
-  var localAssigned={};        // ← счётчик: сколько МЫ назначили на каждую шахту в этом цикле
   for(var wi=0;wi<workers.length;wi++){
     var wk=workers[wi];
-    // excludeWorkers=null — иначе сами себя исключаем из подсчёта,
-    // localAssigned корректно учитывает «уже назначенных в этом цикле»
-    var mine=g.findVisibleResourceForWorker(wk,'gold',1600,null,localAssigned);
+    // excludeWorkers=null — countGatherers видит уже назначенных в этом же цикле
+    var mine=g.findVisibleResourceForWorker(wk,'gold',1600,null);
     if(mine){
-      localAssigned[mine.id]=(localAssigned[mine.id]||0)+1;
       wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
       wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
       wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
@@ -16742,27 +16739,27 @@ function clearAllCaches(){
     }
         if(_wlist.length && !_hasHero){
       if(k===_K.toMine){
-        e.preventDefault();
-        var _assignN=0;
-        for(var _wj=0;_wj<_wlist.length;_wj++){
-          var _wk=_wlist[_wj];
-          var _m=Game_.findVisibleResourceForWorker(_wk,'gold',1600,_wlist);
-          if(_m){
-            _wk.gatherTarget=_m;_wk._assignedMine=_m;
-            _wk.moveTo=null;_wk._path=null;_wk._pathIdx=0;
-            _wk._insideMine=false;_wk._mineSlot=-1;_wk._waitingForMine=false;
-            _assignN++;
-          }
-        }
-        if(!_assignN) Game_.notify(t_('noResNearby'));
-        return;
-      }
+  e.preventDefault();
+  var _assignN=0;
+  for(var _wj=0;_wj<_wlist.length;_wj++){
+    var _wk=_wlist[_wj];
+    var _m=Game_.findVisibleResourceForWorker(_wk,'gold',1600,null);  // ← null вместо _wlist
+    if(_m){
+      _wk.gatherTarget=_m;_wk._assignedMine=_m;
+      _wk.moveTo=null;_wk._path=null;_wk._pathIdx=0;
+      _wk._insideMine=false;_wk._mineSlot=-1;_wk._waitingForMine=false;
+      _assignN++;
+    }
+  }
+  if(!_assignN) Game_.notify(t_('noResNearby'));
+  return;
+}
       if(k===_K.toWood){
         e.preventDefault();
         var _assignN2=0;
         for(var _wj2=0;_wj2<_wlist.length;_wj2++){
           var _wk2=_wlist[_wj2];
-          var _tr=Game_.findVisibleResourceForWorker(_wk2,'tree',1600,_wlist);
+          var _tr=Game_.findVisibleResourceForWorker(_wk2,'tree',1600,null);
           if(_tr){
             _wk2.gatherTarget=_tr;_wk2._assignedMine=null;
             _wk2.moveTo=null;_wk2._path=null;_wk2._pathIdx=0;
