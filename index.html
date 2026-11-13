@@ -148,7 +148,7 @@ h3{color:#e6c67a;font-size:17px;margin-bottom:14px;text-align:center}
 #go-stats>div>div>div{word-break:break-word}
 .aura-badge img{display:block}
 @media (max-width:600px){#keys-block{display:none!important}}
-@media (max-width:600px){#minimap{width:80px;height:80px}#hud-menu{top:96px}#controls{top:134px}#topbar{font-size:11px;padding:5px 8px;gap:8px;max-width:calc(100vw - 160px)}#portrait-wrap{width:100px}#portrait-canvas{height:60px}.slot-row .num{width:24px;height:24px;line-height:24px;font-size:11px}.slot-row .team-sel{flex:0 0 58px}#actions{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}#unit-bar{bottom:190px;height:50px}#unit-bar .ubtn{width:42px;height:42px}}
+@media (max-width:600px){#minimap{width:80px;height:80px}#hud-menu{top:96px}#controls{top:134px}#topbar{font-size:11px;padding:5px 8px;gap:8px;max-width:calc(100vw - 160px)}#portrait-wrap{width:100px}.slot-row .num{width:24px;height:24px;line-height:24px;font-size:11px}.slot-row .team-sel{flex:0 0 58px}#actions{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}#unit-bar{bottom:190px;height:50px}#unit-bar .ubtn{width:42px;height:42px}}
 </style>
 </head>
 
@@ -12327,7 +12327,7 @@ AIController.prototype.stageArmy=function(){
     if(u.gatherTarget) continue; // рабочих на их ресурсе не трогаем
     for(var ri3=0;ri3<g.resources.length;ri3++){
       var rr3=g.resources[ri3];if(rr3.dead||rr3.falling) continue;
-      var rrr=(rr3.kind==='gold')?rr3.radius*0.55:34;
+      var rrr=(rr3.kind==='gold')?rr3.radius*0.55:(TREE_RADIUS-6);
       var rdx=u.x-rr3.x,rdy=u.y-rr3.y,rd=Math.hypot(rdx,rdy),rmin=u.radius+rrr;
       if(rd<rmin){
         var rang=rd>0.01?Math.atan2(rdy,rdx):Math.random()*TAU;
