@@ -8244,8 +8244,10 @@ Game.prototype.updateBuilding=function(b,dt){
             if(dc2>b.rng) continue;
             var ac2=Math.atan2(dyc2,dxc2),diff2=ac2-ang;
             while(diff2>Math.PI) diff2-=TAU; while(diff2<-Math.PI) diff2+=TAU;
-            if(Math.abs(diff2)<half){
-              cr.hp-=b.atk;cr.hitFlash=0.2;cr.lastAttacker=b;
+                        if(Math.abs(diff2)<half){
+              var _crDmg=b.atk;
+              if(cr.armor) _crDmg=_crDmg/cr.armor;
+              cr.hp-=_crDmg;cr.hitFlash=0.2;cr.lastAttacker=b;
               if(tu.burnDmg){cr.bleedT=Math.max(cr.bleedT||0,tu.burnDur);cr.bleedDmg=Math.max(cr.bleedDmg||0,tu.burnDmg);}
               if(cr.hp<=0 && !cr.dying){
                 for(var _h3=0;_h3<this.units.length;_h3++){
@@ -8719,8 +8721,8 @@ Game.prototype.performAttack=function(a,t){
   if(a.isHero&&a.activeBuffT>0&&a.buffType==='rage') dmg*=1.3;
   if(a.isHero&&a.holyStrikeBuff){dmg*=1.6;a.holyStrikeBuff=false;a.holyStrikeT=0;}
   if(t.isUnit){var upD=this.getUnitUpgrades(t.pid,t.role);dmg=dmg*(1-0.08*upD.a);}
-  var _isProjectileAtk=(a.role==='ranged'||a.role==='siege'||a.role==='fly'||(a.role==='heal'&&t.team!==a.team));
-  if(t.isUnit && t.armor && !_isProjectileAtk) dmg=dmg/t.armor;
+    var _isProjectileAtk=(a.role==='ranged'||a.role==='siege'||a.role==='fly'||(a.role==='heal'&&t.team!==a.team));
+  if((t.isUnit||t.isCreep) && t.armor && !_isProjectileAtk) dmg=dmg/t.armor;
   if(t.markedT>0&&t.markedBonus>1 && !_isProjectileAtk) dmg*=t.markedBonus;
   if(_isProjectileAtk) mul=1;
   dmg=dmg*mul;
@@ -8837,8 +8839,8 @@ Game.prototype.applyProj=function(p){
   var d=dmg;
   if(p._siege && target.isBuilding) d*=2.5;
   if(target.isBuilding && !target.completed) d*=3;
-    var ignoreArmor=p.effects&&p.effects.ignoreArmor;
-    if(!ignoreArmor && target.isUnit&&target.armor) d/=target.armor;
+        var ignoreArmor=p.effects&&p.effects.ignoreArmor;
+    if(!ignoreArmor && (target.isUnit||target.isCreep) && target.armor) d/=target.armor;
     if(target.markedT>0&&target.markedBonus>1) d*=target.markedBonus;
     if(target.isUnit&&this.auraCache.blessing[target.id]) d*=0.9;
     d=Math.round(d);
@@ -10016,8 +10018,9 @@ Game.prototype._pointInBuildingBounds=function(wx,wy,b,z){
   return wx>=b.x-radX-pad && wx<=b.x+radX+pad && wy>=b.y-radTop-pad && wy<=b.y+radBot+pad;
 };
 Game.prototype._pointInCreepBounds=function(wx,wy,c,z){
+  var spriteH = c.isBoss ? 96 : 80;
   var rad=Math.max(c.radius*1.9,26);
-  var top=c.y-80*0.94+10/z, bot=c.y+80*0.08;
+  var top=c.y-spriteH*0.94+10/z, bot=c.y+spriteH*0.08;
   var pad=10/z;
   return wx>=c.x-rad-pad && wx<=c.x+rad+pad && wy>=top-pad && wy<=bot+pad;
 };
@@ -10054,18 +10057,20 @@ Game.prototype.pickScreen=function(sx,sy){
     if(d2b<bestBD){bestBD=d2b;bestB=b;}
   }
   if(bestB) return {building:bestB};
-  var bestGold=null,bestGoldD=1e9;
+    var bestGold=null,bestGoldD=1e9;
   for(i=0;i<this.resources.length;i++){
     var gr=this.resources[i];if(gr.dead||gr.kind!=='gold') continue;
+    if(!this.isExplored(gr.x,gr.y)) continue;
     var gcy=gr.y-gr.radius*0.5;
     var dG=(gr.x-w.x)*(gr.x-w.x)+(gcy-w.y)*(gcy-w.y);
     var innerR=gr.radius*1.15+40/z;
     if(dG<innerR*innerR&&dG<bestGoldD){bestGoldD=dG;bestGold=gr;}
   }
   if(bestGold) return {resource:bestGold};
-  var bestR=null,bestRD=1e9;
+    var bestR=null,bestRD=1e9;
   for(i=0;i<this.resources.length;i++){
     var rr=this.resources[i];if(rr.dead||rr.kind==='gold') continue;
+    if(!this.isExplored(rr.x,rr.y)) continue;
     var rcy=rr.y-rr.radius*0.5;
     var d2r=(rr.x-w.x)*(rr.x-w.x)+(rcy-w.y)*(rcy-w.y);
     var rrad=rr.radius*1.1+16/z;
@@ -10301,17 +10306,20 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
     sel[_rri]._speedLimit=null;
     sel[_rri]._armyTag=null;
   }
-  var z=this.camera.zoom||1,wi;
-  var bestB=null,bestBD=1e9;
+    var z=this.camera.zoom||1,wi;
+  var selTeam=(sel&&sel.length)?sel[0].team:this.playerTeam;
+    var bestB=null,bestBD=1e9;
   for(var bi=0;bi<this.buildings.length;bi++){
     var b=this.buildings[bi];if(b.dead) continue;
+    if(b.team!==selTeam && !this.isVisibleForTeam(selTeam,b.x,b.y)) continue;
     if(!this._pointInBuildingBounds(wx,wy,b,z)) continue;
     var d2=(b.x-wx)*(b.x-wx)+(b.y-wy)*(b.y-wy);
     if(d2<bestBD){bestBD=d2;bestB=b;}
   }
-  var bestU=null,bestUD=1e9,bestC=null,bestCD=1e9;
+    var bestU=null,bestUD=1e9,bestC=null,bestCD=1e9;
   for(var i=0;i<this.units.length;i++){
     var u=this.units[i];if(u.dead||u.dying||u._isTotem) continue;
+    if(u.team!==selTeam && !this.isVisibleForTeam(selTeam,u.x,u.y)) continue;
     if(!this._pointInUnitBounds(wx,wy,u,z)) continue;
     var d2u=(u.x-wx)*(u.x-wx)+(u.y-wy)*(u.y-wy);
     if(d2u<bestUD){bestUD=d2u;bestU=u;}
@@ -10322,8 +10330,7 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
     var d2c=(cc.x-wx)*(cc.x-wx)+(cc.y-wy)*(cc.y-wy);
     if(d2c<bestCD){bestCD=d2c;bestC=cc;}
   }
-  var selTeam=(sel&&sel.length)?sel[0].team:this.playerTeam;
-  for(wi=0;wi<sel.length;wi++){sel[wi].attackMoveTo=null;sel[wi].patrolRoute=null;}
+    for(wi=0;wi<sel.length;wi++){sel[wi].attackMoveTo=null;sel[wi].patrolRoute=null;}
   var bestR=null,bestRD=1e9;
   for(var ri=0;ri<this.resources.length;ri++){
     var r2=this.resources[ri];if(r2.dead||r2.falling) continue;
@@ -16261,7 +16268,13 @@ UISys.prototype.drawMinimap=function(){
   var cs=g.fogCellSize,i,j;
   for(i=0;i<g.fogCols;i++) for(j=0;j<g.fogRows;j++){var f=g.fog[i+j*g.fogCols];if(f===2) continue;ctx.fillStyle=f===1?'rgba(0,0,0,0.55)':'rgba(0,0,0,0.92)';ctx.fillRect(i*cs*sx,j*cs*sy,cs*sx+0.5,cs*sy+0.5);}
   for(i=0;i<g.resources.length;i++){var r=g.resources[i];if(r.dead||!g.isExplored(r.x,r.y)) continue;ctx.fillStyle=r.kind==='gold'?'#ffe066':'#2d5a2d';var sz=r.kind==='gold'?5:3;ctx.fillRect(r.x*sx-sz/2,r.y*sy-sz/2,sz,sz);}
-  for(i=0;i<g.creeps.length;i++){var c=g.creeps[i];if(c.dead||!g.isExplored(c.x,c.y)) continue;ctx.fillStyle=c.isBoss?'#ff6060':'#8a3030';ctx.fillRect(c.x*sx-2,c.y*sy-2,4,4);}
+    for(i=0;i<g.creeps.length;i++){
+    var c=g.creeps[i];if(c.dead) continue;
+    var vis=g.isVisible(c.x,c.y);
+    if(!vis && !g.isExplored(c.x,c.y)) continue;
+    ctx.fillStyle=vis?(c.isBoss?'#ff6060':'#8a3030'):'rgba(90,90,90,0.55)';
+    ctx.fillRect(c.x*sx-2,c.y*sy-2,4,4);
+  }
   for(i=0;i<g.buildings.length;i++){
     var b=g.buildings[i];if(b.dead) continue;
     var visB=(b.pid===g.playerPid)||(b.team===g.playerTeam)||g.isVisible(b.x,b.y);
@@ -16368,20 +16381,28 @@ UISys.prototype.drawMinimap=function(){
 };
 UISys.prototype._showUnitHoverTip=function(){
   if(!Game_||!Renderer_) return;
-  // ПАТЧ J-32: не пересчитывать pickScreen, если мышь не двигалась
-  if(this._lastHoverX===Input.mouseX && this._lastHoverY===Input.mouseY) return;
-  this._lastHoverX=Input.mouseX;this._lastHoverY=Input.mouseY;
+  var moved=(this._lastHoverX!==Input.mouseX || this._lastHoverY!==Input.mouseY);
   var pick=Game_.pickScreen(Input.mouseX,Input.mouseY);
   var id=pick.unit?pick.unit.id:0;
-  if(this._lastHoverUnitId===id) return;
+  this._lastHoverX=Input.mouseX;this._lastHoverY=Input.mouseY;
+  // Перерисовываем тултип, если сменился юнит ИЛИ мышь двигалась ИЛИ юнит получает урон
+  var needRedraw=false;
+  if(this._lastHoverUnitId!==id) needRedraw=true;
+  else if(moved) needRedraw=true;
+  else if(id){
+    var u=pick.unit;
+    if(u.hitFlash>0||u.bleedT>0) needRedraw=true;
+  }
   this._lastHoverUnitId=id;
   if(!id){
     this._mobileTip=false;
     this.$('world-tip').classList.remove('show');
     return;
   }
-  this._mobileTip=true;
-  this.updateWorldTip();
+  if(needRedraw){
+    this._mobileTip=true;
+    this.updateWorldTip();
+  }
 };
 UISys.prototype.renderGameOverStats=function(){
   if(!Game_) return;
@@ -17023,7 +17044,18 @@ function boot(){
         if(UI){UI._lastPortraitAuraHash=null;}
       }
     });
-    window.addEventListener('blur',function(){Audio.pauseAll();});
+        window.addEventListener('blur',function(){
+      Audio.pauseAll();
+      Input.keys={};
+      Input.shiftDown=false;
+      Input._escDown=false;
+      Input.dragging=null;
+      Input.boxSelect=null;
+      Input.pendingOrder=null;
+      Input.pendingTargetedAbility=null;
+      Input.pendingRallyPoint=null;
+      if(UI) UI.hideOrderBar();
+    });
     window.addEventListener('focus',function(){Audio.resume();lastT=0;});
     UI.showScreen('menu');
     requestAnimationFrame(loop);
