@@ -7654,7 +7654,10 @@ Game.prototype.ejectFromBuildings=function(u){
 };
 Game.prototype._smartMove=function(u,dx,dy,spd){
   var d=Math.hypot(dx,dy);if(d<0.01) return false;
-  var _mw=(u.role==='worker'&&u.gatherTarget);
+  // свободный проход сквозь своё здание — только когда идёт К цели сбора,
+  // но НЕ когда возвращается с грузом
+  var _isReturning=(u.role==='worker' && u.carrying && u.carryAmt>=10);
+  var _mw=(u.role==='worker' && u.gatherTarget && !_isReturning);
   var _wpid=u.pid;
   var _bh=function(x,y,ig){return this._wouldHitBuilding(x,y,u.radius,ig,_mw,_wpid);}.bind(this);
 
@@ -7729,7 +7732,7 @@ Game.prototype._handleUnitDeath=function(u){
   this.spawnParticles(u.x,u.y,'#8a1010',10);
   if(this.stats[u.pid]) this.stats[u.pid].unitsLost++;
   var _la=u.lastAttacker;
-  if(_la && typeof _la.pid!=='undefined' && _la.team!==u.team && this.stats[_la.pid]) this.stats[_la.pid].enemiesKilled++;
+if(_la && !_la.dead && !_la.dying && typeof _la.pid!=='undefined' && _la.team!==u.team && this.stats[_la.pid]) this.stats[_la.pid].enemiesKilled++;
   if(u.isHero) Audio.sfx('hero_death',u.x,u.y);
   else Audio.sfx('death',u.x,u.y);
   this.decals.push(new Decal(u.x,u.y+4,u.radius*1.4));
@@ -8154,7 +8157,7 @@ Game.prototype.updateBuilding=function(b,dt){
     Audio.sfx('building_destroy',b.x,b.y);
     if(this.stats[b.pid]) this.stats[b.pid].buildingsLost++;
     var _bla=b.lastAttacker;
-    if(_bla && typeof _bla.pid!=='undefined' && _bla.team!==b.team && this.stats[_bla.pid]) this.stats[_bla.pid].buildingsDestroyed++;
+if(_bla && !_bla.dead && !_bla.dying && typeof _bla.pid!=='undefined' && _bla.team!==b.team && this.stats[_bla.pid]) this.stats[_bla.pid].buildingsDestroyed++;
     // ПАТЧ J-9: XP за разрушенное здание
     if(_bla&&!b._isSummon){
       var _bXP=(b.kind==='townhall')?100:(b.kind==='barracks'||b.kind==='forge')?60:40;
@@ -9371,7 +9374,7 @@ Game.prototype.findNearestResource=function(x,y,kind,pid){
   }
   return best;
 };
-Game.prototype.findVisibleResourceForWorker=function(u,kind,radius,excludeWorkers){
+Game.prototype.findVisibleResourceForWorker=function(u,kind,radius,excludeWorkers,localAssigned){
   var best=null,bd=Infinity;
   var team=this.playerTeam;
   for(var s=0;s<this.config.slots.length;s++){
@@ -9391,8 +9394,11 @@ Game.prototype.findVisibleResourceForWorker=function(u,kind,radius,excludeWorker
       if(Math.hypot(b.x-r.x,b.y-r.y)<520){nearEnemyBase=true;break;}
     }
     if(nearEnemyBase) continue;
-    // ПАТЧ 2-fix: excludeWorkers — не считаем тех, кого сами же отправляем
-    if(kind==='gold'&&this.countGatherers(r,excludeWorkers)>=MAX_GATHER_PER_MINE) continue;
+    if(kind==='gold'){
+      var cnt=this.countGatherers(r,excludeWorkers);
+      if(localAssigned&&localAssigned[r.id]) cnt+=localAssigned[r.id];
+      if(cnt>=MAX_GATHER_PER_MINE) continue;
+    }
     var d=(r.x-u.x)*(r.x-u.x)+(r.y-u.y)*(r.y-u.y);
     if(d<r2&&d<bd){bd=d;best=r;}
   }
@@ -11047,7 +11053,7 @@ function AIController(game,team,race,homeX,homeY,pid){
   this.difficulty=Settings.difficulty||'normal';
   this.trainRate=this.difficulty==='easy'?0.55:this.difficulty==='hard'?1.6:0.95;
   this.heroAbilityTimer=2;this.scoutTimer=12;this.expandTimer=100;this.heroLevelTimer=5;this.helpTimer=4;
-  this.retreatTimer=1;this.raidTimer=8;this._scoutUnit=null;this.stuckCheckTimer=2.5;this.workerRaidTimer=20;
+  this.retreatTimer=1;this.raidTimer=8;this.stuckCheckTimer=2.5;this.workerRaidTimer=20;
   this._attacking=false;this._currentTarget=null;this.techTimer=6;this.smallRaidTimer=18;
   this.repairTimer=5;this.stagingTimer=3;this.joinAllyTimer=6;this._rallyT=0;this.myTHAlive=true;
   this._heavyAttackCount=0;this._underHeavyAttack=false;
@@ -11055,14 +11061,12 @@ function AIController(game,team,race,homeX,homeY,pid){
   this.knownEnemyBuildings={};
   this.knownGoldMines=[];
   this._scoutInfoTimer=2;
-  this._scoutDataAge=0;
   this.strategy='balanced';
   this._strategyTimer=60;
   this.microTimer=0;
   this.threatProximityTimer=1.2;
   this._enemyHeroDownT=0;
-  this._heroAggro=false;
-    this._attackingTag=null;
+  this._attackingTag=null;
   this._attackStartTime=0;
   this._attackDelayT=0;
   this.goldBalanceTimer=15;
@@ -11142,7 +11146,7 @@ AIController.prototype.onBuildingDestroyed=function(b,isOwnTeam){
   }
 };
 AIController.prototype.onHeroLevel=function(h,lvl){
-  if(lvl>=6){ this.atkTimer=Math.min(this.atkTimer,4); this._heroAggro=true; }
+  if(lvl>=6){ this.atkTimer=Math.min(this.atkTimer,4); }
   if(lvl>=8){ this.atkTimer=Math.min(this.atkTimer,2); }
 };
 AIController.prototype._hasTH=function(){
@@ -11247,7 +11251,6 @@ AIController.prototype._getDesiredSplit=function(){
 };
 AIController.prototype._updateKnownInfo=function(){
   var g=this.g;
-  this._scoutDataAge+=0.6;
   for(var i=0;i<g.buildings.length;i++){
     var b=g.buildings[i];
     if(b.team===this.team||b.dead) continue;
@@ -12789,7 +12792,6 @@ AIController.prototype.doScout=function(){
   scout.moveTo={x:cl(_pt.x,60,g.W-60),y:cl(_pt.y,60,g.H-60)};
   scout.stance='aggressive';
   scout._path=null;scout._pathIdx=0;
-  this._scoutUnit=scout;
 };
 AIController.prototype.setRallyPoints=function(){
   var g=this.g;var th=null;
@@ -13973,7 +13975,6 @@ for(i=0;i<g.bolts.length;i++){
   this._settingsFromPause=false;
   this._goTab='players';
   this._activeUnitId=null;
-  this._lastUnitBarHash='';
   this._inspectEnt=null;
   this._abilityButtons=[];
   this._lastPortraitAuraHash=null;
@@ -14387,7 +14388,6 @@ UISys.prototype.exitMenu=function(){
   this.$('alert').classList.remove('active');
   document.getElementById('vignette').classList.remove('active');
   this._lastActionsHash='';
-  this._lastUnitBarHash='';
   this._activeUnitId=null;
   this._abilityButtons=[];
   this._lastPortraitAuraHash=null;
@@ -14518,7 +14518,7 @@ UISys.prototype.startGame=function(){
     this.$('alert').classList.remove('active');
     if(Settings.quality!=='low') document.getElementById('vignette').classList.add('active');
     this.refreshSelection();
-    this._gameOverShown=false;this._lastActionsHash='';this._lastUnitBarHash='';this._activeUnitId=null;
+    this._gameOverShown=false;this._lastActionsHash=''; this._activeUnitId=null;
     this._inspectEnt=null;this._abilityButtons=[];this._lastPortraitAuraHash=null;
     centerCam();
         Audio.init();Audio.resume();Audio.resetCooldowns();Audio.startMusic(map.biome);
@@ -14568,7 +14568,7 @@ UISys.prototype.doLoad=function(slot){
     this.$('settings').classList.remove('active');
     if(Settings.quality!=='low') document.getElementById('vignette').classList.add('active');
     this.refreshSelection();
-    this._gameOverShown=false;this._lastActionsHash='';this._lastUnitBarHash='';this._activeUnitId=null;
+    this._gameOverShown=false;this._lastActionsHash='';this._activeUnitId=null;
     this._inspectEnt=null;this._abilityButtons=[];this._lastPortraitAuraHash=null;
     centerCam();
     Audio.init();Audio.resume();Audio.startMusic(map.biome);
@@ -14901,9 +14901,10 @@ UISys.prototype.cycleActiveUnit=function(dir){
         html+='<div class="pbar"><div class="fill" style="width:'+xpPct+'%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div><div class="lbl">XP '+xpPct+'%</div></div>';
       }
       if(ent._isSummon && ent._summonT>0){
-        var _sumPct=Math.max(0,Math.min(100,Math.round(ent._summonT/(ent.role==='elite'?45:30)*100)));
-        html+='<div class="pbar"><div class="fill" style="width:'+_sumPct+'%;background:linear-gradient(90deg,#8a4a1a,#ffb040)"></div><div class="lbl">Призыв '+Math.ceil(ent._summonT)+'с</div></div>';
-      }
+  var _sumMax = ent._isTotem ? 15 : (ent.role==='elite' ? 45 : 30);
+  var _sumPct = Math.max(0, Math.min(100, Math.round(ent._summonT/_sumMax*100)));
+  html+='<div class="pbar"><div class="fill" style="width:'+_sumPct+'%;background:linear-gradient(90deg,#8a4a1a,#ffb040)"></div><div class="lbl">Призыв '+Math.ceil(ent._summonT)+'с</div></div>';
+}
       var regenHp=(ent.raceRegen||0)+(ent.regenPassive||0);
       var regenMp=0;
       if(ent.isHero) regenMp=3;
@@ -15687,23 +15688,27 @@ else if(sel.length){
     var _hkR=(_wk_keys.repair||'r').toUpperCase();
     if(race) this.addAction(box,toolIconImg('hammer'),t_('build'),null,function(){self.showBuildMenu();},false,false,'Построить здание',undefined,_hkB);
         this.addAction(box,toolIconImg('toMine'),t_('toMine'),null,function(){
-      var assigned=0;
-      for(var wi=0;wi<workers.length;wi++){
-        var wk=workers[wi];
-        var mine=g.findVisibleResourceForWorker(wk,'gold',1600,workers);
-        if(mine){
-          wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
-          wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
-          wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
-          wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
-          wk._path=null;wk._pathIdx=0;
-          wk.stationed=false;
-          assigned++;
-        }
-      }
-      if(!assigned) g.notify(t_('noResNearby'));
-      else Audio.sfx('click');
-    },false,false,'Добывать золото',undefined,_hkG);
+  var assigned=0;
+  var localAssigned={};        // ← счётчик: сколько МЫ назначили на каждую шахту в этом цикле
+  for(var wi=0;wi<workers.length;wi++){
+    var wk=workers[wi];
+    // excludeWorkers=null — иначе сами себя исключаем из подсчёта,
+    // localAssigned корректно учитывает «уже назначенных в этом цикле»
+    var mine=g.findVisibleResourceForWorker(wk,'gold',1600,null,localAssigned);
+    if(mine){
+      localAssigned[mine.id]=(localAssigned[mine.id]||0)+1;
+      wk.gatherTarget=mine;wk._assignedMine=mine;wk.carrying=null;wk.carryAmt=0;
+      wk.moveTo=null;wk.buildTarget=null;wk.repairTarget=null;wk.demolishTarget=null;wk.target=null;wk.lockedTarget=null;
+      wk.gatherProgress=0;wk.gatherAnimT=0;wk._stuckTimer=0;
+      wk._insideMine=false;wk._mineSlot=-1;wk._waitingForMine=false;
+      wk._path=null;wk._pathIdx=0;
+      wk.stationed=false;
+      assigned++;
+    }
+  }
+  if(!assigned) g.notify(t_('noResNearby'));
+  else Audio.sfx('click');
+},false,false,'Добывать золото',undefined,_hkG);
         this.addAction(box,toolIconImg('toWood'),t_('toWood'),null,function(){
       var assigned=0;
       for(var wi=0;wi<workers.length;wi++){
