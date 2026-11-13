@@ -7846,63 +7846,7 @@ u._prevXLast=u.x;u._prevYLast=u.y;
       u._lastStuckX=u.x;u._lastStuckY=u.y;
     }
   }
-            if(u.dying){
-    u.deathT += dt;
-    if(u.deathT > 1.2) {
-      u.dead = true;
-      if(!u._isSummon) this.decals.push(new Decal(u.x,u.y+6,u.radius*1.6));
-    }
-    return;
-  }
-    if(u.hp<=0 && !u.dying){
-    u.dying=true;u.deathT=0;
-    // ПАТЧ J-29: при UP/DOWN — случайно влево/вправо, не всегда вправо
-    u.deathDir=(u.dir===DIR.LEFT)?-1:(u.dir===DIR.RIGHT)?1:((u.id%2)?1:-1);
-    if(u._isSummon){return;}
-    this.spawnParticles(u.x,u.y,'#8a1010',10);
-    if(this.stats[u.pid]) this.stats[u.pid].unitsLost++;
-    var _la=u.lastAttacker;
-    if(_la && typeof _la.pid!=='undefined' && _la.team!==u.team && this.stats[_la.pid]) this.stats[_la.pid].enemiesKilled++;
-    if(u.isHero) Audio.sfx('hero_death',u.x,u.y);
-    else Audio.sfx('death',u.x,u.y);
-    this.decals.push(new Decal(u.x,u.y+4,u.radius*1.4));
-    var _deadTeam=u.team;
-    for(var _aiD=0;_aiD<this.ai.length;_aiD++){
-      var _aiObj=this.ai[_aiD];
-      if(!_aiObj.onUnitKilled) continue;
-      if(_aiObj.team===_deadTeam) _aiObj.onUnitKilled(u,true);
-      else if(_aiObj.team!==_deadTeam) _aiObj.onUnitKilled(u,false);
-    }
-    if(u.role!=='fly'&&u.role!=='worker'&&!(u.isHero&&u.race==='sylvanid')){
-      var vx=(Math.random()-0.5)*80,vy=-60-Math.random()*60;
-      this.weapons.push(new WeaponDrop(u.x+(Math.random()-0.5)*20,u.y-10,u.role,u.race,u.team,vx,vy));
-    }
-    if(u.isHero){
-      if(u.owner==='player') this.notify(t_('heroDied'));
-      var _dk3=u.pid+'_'+(u.heroType||'paladin');
-      this.deadHeroes[_dk3]={race:u.race,heroType:u.heroType||'paladin',level:u.level,exp:u.exp,
-        abilityLevels:JSON.parse(JSON.stringify(u.abilityLevels||{})),
-        skillPoints:u.skillPoints||0,ultUnlocked:!!u.ultUnlocked};
-      var la2=u.lastAttacker;
-      if(la2&&typeof la2.pid!=='undefined'&&la2.team!==u.team&&this.teams[la2.pid]){
-        this.addRes(la2.pid,BOUNTY_HERO,0);
-        this.floaters.push(new Floater(u.x,u.y-65,'+'+BOUNTY_HERO,'#ffe066'));
-        if(la2.owner==='player') this.notify(t_('bountyHero'));
-        // ПАТЧ J-8: XP за убийство героя
-        if(la2&&!la2.dying&&la2.pid!==u.pid){
-          if(la2.isHero) this.grantXP(la2,150);
-          else{
-            for(var _xpi=0;_xpi<this.units.length;_xpi++){
-              var _xph=this.units[_xpi];
-              if(!_xph.isHero||_xph.pid!==la2.pid||_xph.dying) continue;
-              if(Math.hypot(_xph.x-u.x,_xph.y-u.y)<450){this.grantXP(_xph,150);break;}
-            }
-          }
-        }
-      }
-    }
-    return;
-  }
+  
   u.animT+=dt;
   if(u.hitFlash>0) u.hitFlash-=dt;
   if(u.atkCd>0) u.atkCd-=dt;
@@ -7967,8 +7911,7 @@ u._prevXLast=u.x;u._prevYLast=u.y;
       if(e2){ this._markAutoAcquire(u); u.target=e2; }
     }
   }
-    if(u.stance!=='hold'&&!u.stationed&&!u.target&&!u._retreating){
-    var isIdleWorker=u.role==='worker'&&!u.gatherTarget&&!u.buildTarget&&!u.repairTarget&&!u.moveTo&&!u.carrying&&!hasOrder&&!u.demolishTarget&&!u._waitingForMine&&!u._insideMine&&!u.stationed;
+        if(u.stance!=='hold'&&!u.stationed&&!u.target&&!u._retreating){
     var isIdleCombat=u.role!=='worker'&&!u.moveTo&&!u.buildTarget&&!u.gatherTarget&&!hasOrder&&!u.stationed;
     if(isIdleCombat){
       if(u.role==='heal'){
@@ -7995,10 +7938,6 @@ u._prevXLast=u.x;u._prevYLast=u.y;
         if(!e) e=this.findNearestCreep(u,u.vision||280);
         if(e){ this._markAutoAcquire(u); u.target=e; }
       }
-    } else if(isIdleWorker){
-      var ew=this.findEnemy(u,u.vision||220);
-      if(!ew) ew=this.findNearestCreep(u,u.vision||220);
-      if(ew){ this._markAutoAcquire(u); u.target=ew; }
     }
   }
   if(u.stance==='hold'&&!u.target&&!u.gatherTarget&&!u.buildTarget&&!u.moveTo&&!u.repairTarget&&!hasOrder&&!u.demolishTarget){
