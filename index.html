@@ -543,7 +543,22 @@ resurrect:"Resurrect",mineFull:"Mine is full (5/5)",
   hero_inquisitor:"Inquisitor",hero_shaman:"Outcast Shaman",hero_hunter:"Hunter",
   e_inq_fire:"Fiery Judgment",e_inq_mark:"Heresy Mark",e_inq_exec:"Execution",e_inq_wrath:"Divine Wrath",
   e_sha_chain:"Chain Lightning",e_sha_totem:"Skull Totem",e_sha_harvest:"Blood Harvest",e_sha_quake:"Earthquake",
-  e_hun_mark:"Hunter's Mark",e_hun_volley:"Thorn Volley",e_hun_heal:"Nature's Cure",e_hun_moonarrow:"Moon Arrow"}};
+  e_hun_mark:"Hunter's Mark",e_hun_volley:"Thorn Volley",e_hun_heal:"Nature's Cure",e_hun_moonarrow:"Moon Arrow"}
+      ,
+orders:"Orders",retreat:"Retreat",setRally:"Set rally point",rallySet:"Rally point set",rallyClear:"Rally point cleared",rallyHint:"LMB — set. RMB on building with point — remove.",
+holdOn:"Hold on",holdOff:"Hold off",
+waitTrain:"Wait for recruitment to finish",thUpgrading:"Town Hall is upgrading",
+unitLimit:"Unit limit (300) — cannot recruit",useResurrect:"Use Resurrect",
+forgeTrainBusy:"Recruitment in progress — wait",resurrecting:"Resurrection already in progress",
+cancelled:"Cancelled",buildPct:"Building",selectedN:"Selected",heroLbl:"Hero",
+resurrectingLbl:"Resurrecting",towerUpgTitle:"Tower upgrade (1 of 2, permanent)",
+towerUpgInProgress:"Upgrading",cancelTowerUpg:"Cancel upgrade",
+cancelTowerUpgTip:"Cancel tower upgrade. Refunds 50% cost",
+sawmillMax:"Sawmill MAX",sawmillUpgrading:"Sawmill upgrading",
+upgradeSawmillTo:"Upgrade sawmill→",needTHLvl:"Requires Town Hall lv.",
+sawmillUpgTip:"Upgrade sawmill to lv.{n}\nAll owner's buildings +{p}% HP\n(Does not stack with other sawmills)\nTime: {t}s",
+groupN:"Group",summonLbl:"Summon",lvlShort:"Lv.",
+resurrectCancelTip:"Cancel resurrection. Refunds full cost."};
 var LC='ru';
 function t_(k){if(!T[LC]) LC='ru';if(T[LC][k]!==undefined) return T[LC][k];if(T.ru[k]!==undefined) return T.ru[k];return k;}
 Settings.load();
@@ -10499,7 +10514,7 @@ Game.prototype.applyRightClick=function(wx,wy,sel){
     if(isOwnBuilding && !anyWorkerSel && b2.rallyPoint){
       b2.rallyPoint=null;
       Audio.sfx('click');
-      if(UI) UI.showHint('Точка сбора убрана',1);
+      if(UI) UI.showHint(t_('rallyClear'),1);
       return;
     }
   }
@@ -13493,7 +13508,7 @@ Renderer.prototype.drawBuilding=function(b){
     ctx.fillStyle='#ffe9a8';ctx.fillRect(bxR,byR,bwR*prR,bhR);
     ctx.strokeStyle='#3a2010';ctx.lineWidth=1.5;ctx.strokeRect(bxR-2,byR-2,bwR+4,bhR+4);
     ctx.fillStyle='#ffe9a8';ctx.font='bold '+(10*z)+'px Arial';ctx.textAlign='center';ctx.strokeStyle='#000';ctx.lineWidth=2.5;
-    var txtR='Воскрешение '+Math.ceil(rq.timeLeft)+'с';
+    var txtR=t_('resurrectingLbl')+' '+Math.ceil(rq.timeLeft)+'с';
     ctx.strokeText(txtR,p.x,byR-4);ctx.fillText(txtR,p.x,byR-4);
   }
   if(b.kind==='lumber'&&b.sawmillUpgrading){
@@ -13503,7 +13518,7 @@ Renderer.prototype.drawBuilding=function(b){
     ctx.fillStyle='#c8a878';ctx.fillRect(bxL,byL,bwL*prL,bhL);
     ctx.strokeStyle='#3a2010';ctx.lineWidth=1.5;ctx.strokeRect(bxL-2,byL-2,bwL+4,bhL+4);
     ctx.fillStyle='#ffe9a8';ctx.font='bold '+(10*z)+'px Arial';ctx.textAlign='center';ctx.strokeStyle='#000';ctx.lineWidth=2.5;
-    var txtL='Улучшение лесопилки '+Math.round(prL*100)+'%';
+    var txtL=t_('sawmillUpgrading')+' '+Math.round(prL*100)+'%';
     ctx.strokeText(txtL,p.x,byL-4);ctx.fillText(txtL,p.x,byL-4);
   }
   if(b.kind==='lumber'&&b.completed&&(b.sawmillLevel||0)>0){
@@ -14469,7 +14484,7 @@ UISys.prototype.togglePause=function(show){
 UISys.prototype.showHint=function(text,secs){var h=this.$('hint');if(!h) return;h.textContent=text;h.classList.add('show');setTimeout(function(){h.classList.remove('show');},(secs||4)*1000);};
       UISys.prototype.showGroupBadge=function(n){
   var el=this.$('group-badge');if(!el) return;
-  el.textContent='Группа '+n;
+  el.textContent=t_('groupN')+' '+n;
   el.style.display='block';
   if(this._groupBadgeTO) clearTimeout(this._groupBadgeTO);
   this._groupBadgeTO=setTimeout(function(){el.style.display='none';},1500);
@@ -14734,13 +14749,13 @@ UISys.prototype.refreshSelection=function(){
   }
   if(!sel.length&&!selB.length){info.classList.remove('show');this.$('actions').innerHTML='';this.drawPortrait(null);this._lastActionsHash='';this.$('cmdpanel').classList.remove('show');this.$('queue-panel').classList.remove('show');if(this.refreshUnitBar) this.refreshUnitBar();return;}
   this.$('cmdpanel').classList.add('show');info.classList.add('show');
-  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
-  else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
+  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent=t_('heroLbl')+': '+_hn+' '+t_('lvlShort')+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
+  else if(sel.length>1) info.textContent=t_('selectedN')+': '+sel.length;
   else{
   var b2=selB[0];
   var _bldSt2;
-  if(b2.completed) _bldSt2='Ур.'+b2.level;
-  else _bldSt2='Стройка '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
+  if(b2.completed) _bldSt2=t_('lvlShort')+b2.level;
+  else _bldSt2=t_('buildPct')+' '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
   info.textContent=bldName(b2.race,b2.kind)+' '+_bldSt2+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;
 }
   var activeEnt=null;
@@ -14790,13 +14805,13 @@ UISys.prototype.refreshInfoOnly=function(){
   }
   if(!sel.length&&!selB.length) return;
   var info=this.$('selinfo');
-  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent='Герой: '+_hn+' Ур.'+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
-  else if(sel.length>1) info.textContent='Выбрано: '+sel.length;
+  if(sel.length===1){var f=sel[0];if(f.isHero){var _hk='hero_'+(f.heroType||'paladin');var _hn=(t_(_hk)!==_hk)?t_(_hk):uName(f.race,'hero');info.textContent=t_('heroLbl')+': '+_hn+' '+t_('lvlShort')+f.level+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100)+(f.skillPoints>0?' | Очки: '+f.skillPoints:'');}else if(f.isHealer) info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp+' | '+t_('mana')+' '+Math.floor(f.mana||0)+'/'+(f.maxMana||100);else info.textContent=uName(f.race,f.role)+' | HP '+Math.ceil(f.hp)+'/'+f.maxHp;}
+  else if(sel.length>1) info.textContent=t_('selectedN')+': '+sel.length;
   else{
   var b2=selB[0];
   var _bldSt3;
-  if(b2.completed) _bldSt3='Ур.'+b2.level;
-  else _bldSt3='Стройка '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
+  if(b2.completed) _bldSt3=t_('lvlShort')+b2.level;
+  else _bldSt3=t_('buildPct')+' '+Math.round((b2.buildProgress/Math.max(1,b2.buildTime))*100)+'%';
   info.textContent=bldName(b2.race,b2.kind)+' '+_bldSt3+' | '+Math.ceil(b2.hp)+'/'+b2.maxHp;
 }
 };
@@ -14946,7 +14961,7 @@ UISys.prototype.cycleActiveUnit=function(dir){
       var _nameKey2=ent.isHero?('hero_'+(ent.heroType||'paladin')):'';
       var _nameDisp=ent.isHero?((t_(_nameKey2)!==_nameKey2)?t_(_nameKey2):uName(ent.race,'hero')):uName(ent.race,ent.role);
       var name=ent.isHero?('⭐ '+_nameDisp):_nameDisp;
-      var extra=ent.isHero?(' Ур.'+ent.level):'';
+      var extra=ent.isHero?(' '+t_('lvlShort')+ent.level):'';
       var ownerTag=isOwnEnt?'':' <span style="color:#ff8080">[T'+(ent.team+1)+']</span>';
       var html='<div class="pname">'+name+extra+ownerTag+'</div>';
       var hpPct=Math.max(0,Math.min(100,Math.round(ent.hp/ent.maxHp*100)));
@@ -14965,7 +14980,7 @@ UISys.prototype.cycleActiveUnit=function(dir){
       if(ent._isSummon && ent._summonT>0){
   var _sumMax = ent._isTotem ? 15 : (ent.role==='elite' ? 45 : 30);
   var _sumPct = Math.max(0, Math.min(100, Math.round(ent._summonT/_sumMax*100)));
-  html+='<div class="pbar"><div class="fill" style="width:'+_sumPct+'%;background:linear-gradient(90deg,#8a4a1a,#ffb040)"></div><div class="lbl">Призыв '+Math.ceil(ent._summonT)+'с</div></div>';
+  html+='<div class="pbar"><div class="fill" style="width:'+_sumPct+'%;background:linear-gradient(90deg,#8a4a1a,#ffb040)"></div><div class="lbl">'+t_('summonLbl')+' '+Math.ceil(ent._summonT)+'с</div></div>';
 }
       var regenHp=(ent.raceRegen||0)+(ent.regenPassive||0);
       var regenMp=0;
@@ -15424,13 +15439,13 @@ UISys.prototype.cancelConstruction=function(b){
   }
   b.dead=true;
   g.navDirty=true;
-  g.floaters.push(new Floater(b.x,b.y-40,'Отменено','#ffe9a8'));
+  g.floaters.push(new Floater(b.x,b.y-40,t_('cancelled'),'#ffe9a8'));
   Audio.sfx('click');
   this.refreshSelection();
 };
 UISys.prototype.upgradeTH=function(b){
   var g=Game_;if(!g||!b||b.upgrading||b.level>=3) return;
-  if(b.queue&&b.queue.length>0){g.notify('Сначала дождитесь окончания найма');return;}
+  if(b.queue&&b.queue.length>0){g.notify(t_('waitTrain'));return;}
   var cost=TH_UPG[b.level];if(!cost) return;
   var res=g.getRes(g.playerPid);
   if(res.gold<cost.gold||res.wood<cost.wood){g.notify(t_('nGold'));return;}
@@ -15449,7 +15464,7 @@ UISys.prototype.upgradeUnit=function(role,stat){
       UISys.prototype.queueUnit=function(b,role){
   var g=Game_;if(!g||!b) return;
   if(b.kind==='forge'&&b.techUpgrading){g.notify(t_('forgeBusy'));return;}
-  if(b.kind==='townhall'&&b.upgrading){g.notify('Идёт улучшение ратуши');return;}
+  if(b.kind==='townhall'&&b.upgrading){g.notify(t_('thUpgrading'));return;}
   var race=RACES[b.race];if(!race) return;
   var def=race.units[role];if(!def) return;
   var _hTypeArg=arguments[2];
@@ -15469,7 +15484,7 @@ UISys.prototype.upgradeUnit=function(role,stat){
     _queuedCount+=_qb.queue.length;
   }
   if(_nonSummon+_queuedCount>=300){
-    g.notify('Лимит юнитов (300) — найм невозможен');
+    g.notify(t_('unitLimit'));
     return;
   }
   var res=g.getRes(g.playerPid),reserved=g.getReservedPop(g.playerPid);
@@ -15492,7 +15507,7 @@ UISys.prototype.upgradeUnit=function(role,stat){
       if(_inQ) break;
     }
     if(_inQ){g.notify(t_('heroExists'));return;}
-    if(g.deadHeroes&&g.deadHeroes[g.playerPid+'_'+_wantHT]){g.notify('Используйте Воскресить');return;}
+    if(g.deadHeroes&&g.deadHeroes[g.playerPid+'_'+_wantHT]){g.notify(t_('useResurrect'));return;}
     g.subRes(g.playerPid,def.gold,def.wood);
     b.queue.push({role:'hero',heroType:_wantHT,race:b.race,timeLeft:def.time,timeTotal:def.time});
     Audio.sfx('click');this.renderActions(true);
@@ -15505,7 +15520,7 @@ UISys.prototype.upgradeUnit=function(role,stat){
 UISys.prototype.startForgeUpgrade=function(b,role,stat){
   var g=Game_;if(!g||!b||b.kind!=='forge') return;
   if(b.techUpgrading){g.notify(t_('forgeBusy'));return;}
-  if(b.queue.length>0){g.notify('Идёт найм войск — дождитесь окончания');return;}
+  if(b.queue.length>0){g.notify(t_('forgeTrainBusy'));return;}
   for(var fi=0;fi<g.buildings.length;fi++){
     var fb=g.buildings[fi];
     if(fb.dead||fb.pid!==g.playerPid||fb.kind!=='forge') continue;
@@ -15536,7 +15551,7 @@ UISys.prototype.resurrectHero=function(b,heroType){
   if(res.gold<hv.gold){g.notify(t_('nGold'));return;}
   if(res.wood<hv.wood){g.notify(t_('nWood'));return;}
   if(!b.reviveQueue) b.reviveQueue=[];
-  for(var _rqi=0;_rqi<b.reviveQueue.length;_rqi++){if(b.reviveQueue[_rqi].reviveData&&b.reviveQueue[_rqi].reviveData.heroType===heroType){g.notify('Воскрешение уже идёт');return;}}
+  for(var _rqi=0;_rqi<b.reviveQueue.length;_rqi++){if(b.reviveQueue[_rqi].reviveData&&b.reviveQueue[_rqi].reviveData.heroType===heroType){g.notify(t_('resurrecting'));return;}}
   g.subRes(g.playerPid,hv.gold,hv.wood);
   var time=25+2*(dh.level||1);
   b.reviveQueue.push({role:'hero',heroType:heroType,race:dh.race,timeLeft:time,timeTotal:time,reviveData:dh});
@@ -15553,7 +15568,7 @@ UISys.prototype.cancelTowerUpgrade=function(b){
     g.addRes(g.playerPid,Math.floor(tuDef.cost.gold*refundR),Math.floor(tuDef.cost.wood*refundR));
     g.floaters.push(new Floater(b.x,b.y-60,'+'+Math.floor(tuDef.cost.gold*refundR)+' зол.','#a0ffa0'));
   } else {
-    g.floaters.push(new Floater(b.x,b.y-60,'Отменено','#ffe9a8'));
+    g.floaters.push(new Floater(b.x,b.y-60,t_('cancelled'),'#ffe9a8'));
   }
   b._towerUpgrading=false;
   b._pendingUpgrade=null;
@@ -15644,9 +15659,9 @@ UISys.prototype.renderActions=function(force){
     var needXP=(hero.level*hero.level*30+40);
     var prevXP=(hero.level-1)*(hero.level-1)*30+40;
     var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
-    manaDiv.innerHTML='<span class="mana-text" style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span>'+
+    '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">'+t_('lvlShort')+hero.level+' '+lvlPct+'%</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="mana-fill" style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div>'+
-      '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span>'+
+      '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">'+t_('lvlShort')+hero.level+' '+lvlPct+'%</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
     for(var ai=0;ai<abils.length;ai++){
@@ -15741,7 +15756,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
 
     var _heroGroup=[hero];
   for(var _hz=0;_hz<sel.length;_hz++){if(sel[_hz]!==hero&&sel[_hz].role!=='worker') _heroGroup.push(sel[_hz]);}
-  var _sepC=document.createElement('div');_sepC.className='section-sep';_sepC.textContent='Приказы';box.appendChild(_sepC);
+  var _sepC=document.createElement('div');_sepC.className='section-sep';_sepC.textContent=t_('orders');box.appendChild(_sepC);
       this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,'Атака-движение [A]\nИдти в точку, атакуя всех врагов на пути.\nПКМ — указать цель.',undefined,'A');
   this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,'Стоп [S]\nОстановить выделенных юнитов.\nДвойное нажатие — переключить на агрессивную стойку.',undefined,'S');
   this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,'Патруль [P]\nЮнит ходит между двумя точками, атакуя врагов.\nПКМ — указать вторую точку.',undefined,'P');
@@ -15755,12 +15770,12 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
       _heroGroup[_hw].stance=_ns;
       if(_ns==='hold'){_heroGroup[_hw].originX=_heroGroup[_hw].x;_heroGroup[_hw].originY=_heroGroup[_hw].y;}
     }
-    self.showHint((_ns==='hold'?'Держать вкл':'Держать выкл'),1);
+    self.showHint((_ns==='hold'?t_('holdOn'):t_('holdOff')),1);
     self.renderActions(true);
     },_isHoldHero,false,
     _isHoldHero?'Стойка: Держать позицию\nЮнит не преследует врагов, только отвечает на атаки.\nПовторное нажатие — вернуть агрессию.'
                :'Стойка: Агрессивная\nЮнит преследует врагов в радиусе видимости.\nПолезно для контроля карты.');
-  this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
+  this.addAction(box,toolIconImg('stop'),'⏹ '+t_('retreat'),null,function(){
     var _th=null,_bdT=Infinity;
     for(var _fi=0;_fi<g.buildings.length;_fi++){
       var _tb=g.buildings[_fi];
@@ -15876,12 +15891,12 @@ else if(sel.length){
         fighters[wi].stance=newStance;
         if(newStance==='hold'){fighters[wi].originX=fighters[wi].x;fighters[wi].originY=fighters[wi].y;}
       }
-      self.showHint((newStance==='hold'?'Держать вкл':'Держать выкл'),1);
+      self.showHint((newStance==='hold'?t_('holdOn'):t_('holdOff')),1);
       self.renderActions(true);
         },isHold,false,
       isHold?'Стойка: Держать позицию\nЮнит не преследует врагов, только отвечает на атаки.\nПовторное нажатие — вернуть агрессию.'
             :'Стойка: Агрессивная\nЮнит преследует врагов в радиусе видимости.\nПолезно для контроля карты.');
-    this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
+    this.addAction(box,toolIconImg('stop'),'⏹ '+t_('retreat'),null,function(){
       var th=null,bdT=Infinity;
       for(var fi=0;fi<g.buildings.length;fi++){
         var tb=g.buildings[fi];
@@ -16101,27 +16116,27 @@ else if(sel.length){
     var spawnsUnits=(b2.kind==='townhall'||b2.kind==='barracks'||b2.kind==='magic'||b2.kind==='forge'||b2.kind==='altar');
         if(spawnsUnits&&b2.completed){
       var hasRally=!!b2.rallyPoint;
-      this.addAction(box,toolIconImg('patrol'),(hasRally?'✓ ':'')+'Указать точку сбора',null,function(){
+      this.addAction(box,toolIconImg('patrol'),(hasRally?'✓ ':'')+t_('setRally'),null,function(){
         Input.clearPending('rally');
         Input.pendingRallyPoint=b2;
         self.showOrderBar('ПКМ по земле — точка сбора. Esc — отмена.');
-      },hasRally,false,'ЛКМ — задать. ПКМ на здании с точкой — удалить.',undefined,'T');
+      },hasRally,false,t_('rallyHint'),undefined,'T');
     }
     if(b2.kind==='tower'&&b2.completed){
       if(b2._towerUpgrading){
         var tuPct=Math.max(0,Math.min(100,Math.round((1-b2._towerUpgradeTimeLeft/b2._towerUpgradeTotal)*100)));
         var tuDivP=document.createElement('div');
         tuDivP.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center';
-        tuDivP.textContent='Улучшение: '+tuPct+'% ('+towerUpgradeName(b2._pendingUpgrade)+')';
+        tuDivP.textContent=t_('towerUpgInProgress')+': '+tuPct+'% ('+towerUpgradeName(b2._pendingUpgrade)+')';
         box.appendChild(tuDivP);
         var _tuCancDef=b2._pendingUpgrade?(TOWER_UPGRADES[b2.race]&&TOWER_UPGRADES[b2.race][b2._pendingUpgrade]):null;
         var _refundPrice='';
         if(_tuCancDef){
           _refundPrice=self.costStr(Math.floor(_tuCancDef.cost.gold*0.5),Math.floor(_tuCancDef.cost.wood*0.5));
         }
-        var _cancelTip='Отменить улучшение башни. Вернёт 50% стоимости';
+        var _cancelTip=t_('cancelTowerUpgTip');
         if(_tuCancDef) _cancelTip+=' ('+Math.floor(_tuCancDef.cost.gold*0.5)+' зол., '+Math.floor(_tuCancDef.cost.wood*0.5)+' дер.)';
-                this.addAction(box,toolIconImg('cancel'),'Отменить улучшение',_refundPrice,function(){
+                this.addAction(box,toolIconImg('cancel'),t_('cancelTowerUpg'),_refundPrice,function(){
           self.cancelTowerUpgrade(b2);
         },false,false,_cancelTip,undefined,'X');
       } else if(b2.towerUpgrade){
@@ -16129,12 +16144,12 @@ else if(sel.length){
         var tuName=tuInfo?(LC==='en'?tuInfo.nameEn:tuInfo.name):b2.towerUpgrade;
         var tuDiv=document.createElement('div');
         tuDiv.style.cssText='grid-column:1/-1;color:#a8c5d6;font-size:11px;padding:6px;text-align:center;border-top:1px solid #3d4c68;margin-top:4px';
-        tuDiv.textContent='Улучшение: '+tuName;
+        tuDiv.textContent=t_('towerUpgInProgress')+': '+tuName;
         box.appendChild(tuDiv);
       } else if(towerCanUpgrade(b2)){
         var opts=TOWER_UPGRADES[b2.race]||{};
         var upgHdr=document.createElement('div');
-        upgHdr.className='section-sep';upgHdr.textContent='Улучшение башни (1 из 2, навсегда)';
+        upgHdr.className='section-sep';upgHdr.textContent=t_('towerUpgTitle');
         box.appendChild(upgHdr);
                 var _towerKeys=['U','I'];
         var _towerKeyIdx=0;
@@ -16177,17 +16192,17 @@ else if(sel.length){
     if(b2.kind==='lumber'&&b2.completed){
       var lvlS=b2.sawmillLevel||0;
       if(lvlS>=3){
-        this.addAction(box,toolIconImg('upgrade'),'Лесопилка MAX','',function(){},false,true,'Лесопилка максимально улучшена');
+        this.addAction(box,toolIconImg('upgrade'),t_('sawmillMax'),'',function(){},false,true,'Лесопилка максимально улучшена');
       } else if(b2.sawmillUpgrading){
         var pctS=Math.round((1-b2.sawmillUpgradeTimeLeft/b2.sawmillUpgradeTotal)*100);
-        this.addAction(box,toolIconImg('upgrade'),'Улучшение '+pctS+'%','',function(){},false,true,'Улучшение лесопилки в процессе');
+        this.addAction(box,toolIconImg('upgrade'),t_('sawmillUpgrading')+' '+pctS+'%','',function(){},false,true,'Улучшение лесопилки в процессе');
             } else {
         var costS=SAWMILL_UPG[lvlS];
         var resS=g.getRes(g.playerPid);
         var canS=resS.gold>=costS.gold&&resS.wood>=costS.wood;
         var bonusPct=Math.round(costS.hpBonus*100);
         var tipS='Улучшить лесопилку до ур.'+(lvlS+1)+'\nВсем зданиям владельца +'+bonusPct+'% HP\n(Не складывается с другими лесопилками)\nВремя: '+costS.time+'с';
-        this.addAction(box,toolIconImg('upgrade'),'Улучшить лесопилку→'+(lvlS+1),self.costStr(costS.gold,costS.wood),function(){
+        this.addAction(box,toolIconImg('upgrade'),t_('upgradeSawmillTo')+(lvlS+1),self.costStr(costS.gold,costS.wood),function(){
           var resS2=g.getRes(g.playerPid);
           if(resS2.gold<costS.gold||resS2.wood<costS.wood){g.notify(t_('nGold'));return;}
           g.subRes(g.playerPid,costS.gold,costS.wood);
@@ -16200,7 +16215,7 @@ else if(sel.length){
       }
     }
         if(!b2.completed){
-      var cancelTip='Отменить постройку. Вернёт полную стоимость ('+b2.costGold+'+'+b2.costWood+'), рабочий освободится.';
+      var cancelTip=t_('cancel')+': '+b2.costGold+'+'+b2.costWood;
       this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip,undefined,'C');
     } else if(b2.kind!=='townhall'){
       this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);},false,false,null,undefined,'D');
@@ -16230,7 +16245,7 @@ else if(sel.length){
       var _mf=_mb.querySelector('.mana-fill');
       var _lf=_mb.querySelector('.lvl-fill');
       if(_mt) _mt.textContent=t_('mana')+' '+Math.floor(_cm)+'/'+_mm;
-      if(_lt) _lt.textContent='Ур.'+_hero.level+' '+_lp+'%';
+      if(_lt) _lt.textContent=t_('lvlShort')+_hero.level+' '+_lp+'%';
       if(_mf) _mf.style.width=_mp+'%';
       if(_lf) _lf.style.width=_lp+'%';
     }
@@ -17124,7 +17139,7 @@ canvas.addEventListener('touchstart',function(e){
         if(self.pendingRallyPoint){
           var wprt=Renderer_.s2w(tt.x0,tt.y0);
           var rb2=self.pendingRallyPoint;
-          if(!rb2.dead){rb2.rallyPoint={x:wprt.x,y:wprt.y};Audio.sfx('click');if(UI) UI.showHint('Точка сбора установлена',1.5);}
+          if(!rb2.dead){rb2.rallyPoint={x:wprt.x,y:wprt.y};Audio.sfx('click');if(UI) UI.showHint(t_('rallySet'),1.5);}
           self.pendingRallyPoint=null;if(UI) UI.hideOrderBar();
           self._ignoreMouseUntil=performance.now()+500;self.touchStart=null;self.pinchDist=0;return;
         }
