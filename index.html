@@ -432,8 +432,7 @@ hero_paladin:"Паладин",hero_warchief:"Вождь",hero_archdruid:"Арх�
 hero_inquisitor:"Инквизитор",hero_shaman:"Шаман-изгой",hero_hunter:"Ловчий",
 e_inq_fire:"Огненный суд",e_inq_mark:"Печать ереси",e_inq_exec:"Казнь",e_inq_wrath:"Божественный гнев",
 e_sha_chain:"Цепная молния",e_sha_totem:"Тотем черепа",e_sha_harvest:"Кровавая жатва",e_sha_quake:"Землетрясение",
-e_hun_mark:"Метка охотника",e_hun_volley:"Залп шипов",e_hun_heal:"Природное лечение",e_hun_arrow:"Стрела луны"},
-               ,
+e_hun_mark:"Метка охотника",e_hun_volley:"Залп шипов",e_hun_heal:"Природное лечение",e_hun_arrow:"Стрела луны",
 orders:"Приказы",retreat:"Отступить",setRally:"Указать точку сбора",rallySet:"Точка сбора установлена",rallyClear:"Точка сбора убрана",rallyHint:"ЛКМ — задать. ПКМ на здании с точкой — удалить.",
 holdOn:"Держать вкл",holdOff:"Держать выкл",
 waitTrain:"Сначала дождитесь окончания найма",thUpgrading:"Идёт улучшение ратуши",
@@ -447,10 +446,8 @@ sawmillMax:"Лесопилка MAX",sawmillUpgrading:"Улучшение лес�
 upgradeSawmillTo:"Улучшить лесопилку→",needTHLvl:"Требуется Ратуша ур.",
 sawmillUpgTip:"Улучшить лесопилку до ур.{n}\nВсем зданиям владельца +{p}% HP\n(Не складывается с другими лесопилками)\nВремя: {t}с",
 groupN:"Группа",summonLbl:"Призыв",lvlShort:"Ур.",
-resurrectCancelTip:"Отменить воскрешение. Вернёт полную стоимость."
-
-                        
-         en:{play:"New Game",load:"Load",settings:"Settings",back:"Back",start:"Start",close:"Close",menu:"Menu",
+resurrectCancelTip:"Отменить воскрешение. Вернёт полную стоимость."},
+         en:{play:"New Game",load:"Load",settings:"Settings",...back:"Back",start:"Start",close:"Close",menu:"Menu",
   map:"Map",diff:"Bot difficulty",players:"Players",lang:"Language",vol:"Volume",mus:"Music",edge:"Edge scroll",quality:"Graphics",
   saves:"Saves",pause:"Pause",resume:"Resume",save:"Save",exit:"Menu",
   victory:"VICTORY!",defeat:"DEFEAT",vsub:"Enemies defeated!",dsub:"Your team lost.",
@@ -543,8 +540,7 @@ resurrect:"Resurrect",mineFull:"Mine is full (5/5)",
   hero_inquisitor:"Inquisitor",hero_shaman:"Outcast Shaman",hero_hunter:"Hunter",
   e_inq_fire:"Fiery Judgment",e_inq_mark:"Heresy Mark",e_inq_exec:"Execution",e_inq_wrath:"Divine Wrath",
   e_sha_chain:"Chain Lightning",e_sha_totem:"Skull Totem",e_sha_harvest:"Blood Harvest",e_sha_quake:"Earthquake",
-  e_hun_mark:"Hunter's Mark",e_hun_volley:"Thorn Volley",e_hun_heal:"Nature's Cure",e_hun_moonarrow:"Moon Arrow"}
-      ,
+  e_hun_mark:"Hunter's Mark",e_hun_volley:"Thorn Volley",e_hun_heal:"Nature's Cure",e_hun_moonarrow:"Moon Arrow",
 orders:"Orders",retreat:"Retreat",setRally:"Set rally point",rallySet:"Rally point set",rallyClear:"Rally point cleared",rallyHint:"LMB — set. RMB on building with point — remove.",
 holdOn:"Hold on",holdOff:"Hold off",
 waitTrain:"Wait for recruitment to finish",thUpgrading:"Town Hall is upgrading",
@@ -15661,13 +15657,12 @@ UISys.prototype.renderActions=function(force){
     var manaFillPct=Math.round((curMana/maxMana)*100);
     var needXP=(hero.level*hero.level*30+40);
     var prevXP=(hero.level-1)*(hero.level-1)*30+40;
-    var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
-    '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">'+t_('lvlShort')+hero.level+' '+lvlPct+'%</span>'+
+        var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
+    manaDiv.innerHTML='<span class="mana-text" style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="mana-fill" style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div>'+
       '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">'+t_('lvlShort')+hero.level+' '+lvlPct+'%</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
-    for(var ai=0;ai<abils.length;ai++){
       (function(ab,abIdx){
         var lvl=hero.abilityLevels[ab.id]||0;
         var cd=0;
