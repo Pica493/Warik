@@ -8569,8 +8569,8 @@ Game.prototype.doMove=function(u,dt){
       u._path=null;u._pathIdx=0;
     }
   }
-  var dxGoal=u.moveTo.x-u.x, dyGoal=u.moveTo.y-u.y;
-  var dGoal=Math.hypot(dxGoal,dyGoal);
+    var dxGoal=u.moveTo.x-u.x, dyGoal=u.moveTo.y-u.y;
+  var dGoal=Math.sqrt(dxGoal*dxGoal+dyGoal*dyGoal);
   if(dGoal<12){ u.moveTo=null; u._path=null; u._pathIdx=0; u.originX=u.x; u.originY=u.y; return; }
   if(!u._path){
     var nowT=this.time;
@@ -8656,7 +8656,7 @@ Game.prototype.doAttackMove=function(u,dt){
       dest=u.attackMoveTo;
     }
   }
-  var dx=dest.x-u.x,dy=dest.y-u.y,d=Math.hypot(dx,dy);
+    var dx=dest.x-u.x,dy=dest.y-u.y,d=Math.sqrt(dx*dx+dy*dy);
   if(d<20){if(u.patrolRoute){u.patrolIdx=1-u.patrolIdx;}else{u.attackMoveTo=null;u.originX=u.x;u.originY=u.y;}return;}
   if(!u._path){
     if(this._hasClearPath(u.x,u.y,dest.x,dest.y,u.radius+3)){
@@ -8691,7 +8691,7 @@ Game.prototype.doAttackMove=function(u,dt){
 };
 Game.prototype.doAttack=function(u,dt){
   var t=u.target;if(!t||t.dead){u.target=null;return;}
-  var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);
+    var dx=t.x-u.x,dy=t.y-u.y,d=Math.sqrt(dx*dx+dy*dy);
   var reach=u.range+(t.radius||20)+(u.role==='heal'?40:8);
   if(Math.abs(dx)>Math.abs(dy)) u.dir=dx>=0?DIR.RIGHT:DIR.LEFT;else u.dir=dy>=0?DIR.DOWN:DIR.UP;
   if(d>reach){
@@ -15177,18 +15177,12 @@ UISys.prototype._refreshPortraitBars=function(){
   if(disabled) btn.disabled=true;
       // Извлекаем стоимость только для «ресурсных» цен вида <div>NN<img></div>
   // (иконки gold/wood). Для ability-цен (КД/мана) формат <div style=...><img>NN — не матчится.
-  if(price && /<div>\d+<img/.test(price)){
-    var _cmatches=price.match(/<div>(\d+)<img/g);
-    if(_cmatches){
-      var _n1=_cmatches[0].match(/\d+/);
-      if(_n1) btn.dataset.costG=_n1[0];
-      if(_cmatches[1]){
-        var _n2=_cmatches[1].match(/\d+/);
-        if(_n2) btn.dataset.costW=_n2[0];
-      }
-    }
-    // Кнопка изначально disabled, но ресурсов хватает → значит disabled по состоянию (не по ресурсам)
-    if(disabled && Game_){
+    if(price){
+    var _gm=price.match(/data-r="g">(\d+)</);
+    var _wm=price.match(/data-r="w">(\d+)</);
+    if(_gm) btn.dataset.costG=_gm[1];
+    if(_wm) btn.dataset.costW=_wm[1];
+    if(disabled && Game_ && btn.dataset.costG!==undefined){
       var _r0=Game_.getRes(Game_.playerPid);
       var _cg0=parseInt(btn.dataset.costG)||0, _cw0=parseInt(btn.dataset.costW)||0;
       if(_r0.gold>=_cg0 && _r0.wood>=_cw0) btn.dataset.lockState='1';
@@ -15297,8 +15291,8 @@ UISys.prototype.getActionsHash=function(){
 };
 UISys.prototype.costStr=function(g,w){
   var s='';
-  if(g) s+='<div>'+g+toolIconImg('gold')+'</div>';
-  if(w) s+='<div>'+w+toolIconImg('wood')+'</div>';
+  if(g) s+='<div data-r="g">'+g+toolIconImg('gold')+'</div>';
+  if(w) s+='<div data-r="w">'+w+toolIconImg('wood')+'</div>';
   return s;
 };
 UISys.prototype.foodStr=function(role){
@@ -15631,7 +15625,6 @@ UISys.prototype.renderActions=function(force){
       '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
-    }
     for(var ai=0;ai<abils.length;ai++){
       (function(ab,abIdx){
         var lvl=hero.abilityLevels[ab.id]||0;
@@ -15759,7 +15752,6 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
       _ff._path=null;_ff._pathIdx=0;_ff._retreating=true;
     }
     self.showHint('Отступление',1.2);
-      self.showHint('Отступление',1.2);
   },false,false,'Отступить\nПриказ вернуться к ратуше.\nИспользуется для спасения раненых юнитов.',undefined,'B');
   this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
     g.selectAllCombat();
@@ -16656,6 +16648,8 @@ function clearAllCaches(){
     var resume=function(){Audio.resume();if(UI) UI._hideWc3Tooltip();};
     canvas.addEventListener('mousedown',resume);
     canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
+    canvas.addEventListener('auxclick',function(e){ if(e.button===1) e.preventDefault(); });
+    canvas.addEventListener('pointerdown',function(e){ if(e.button===1) e.preventDefault(); });
         canvas.addEventListener('mousedown',function(e){
       if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
       var r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
