@@ -447,7 +447,7 @@ upgradeSawmillTo:"Улучшить лесопилку→",needTHLvl:"Требу�
 sawmillUpgTip:"Улучшить лесопилку до ур.{n}\nВсем зданиям владельца +{p}% HP\n(Не складывается с другими лесопилками)\nВремя: {t}с",
 groupN:"Группа",summonLbl:"Призыв",lvlShort:"Ур.",
 resurrectCancelTip:"Отменить воскрешение. Вернёт полную стоимость."},
-         en:{play:"New Game",load:"Load",settings:"Settings",...back:"Back",start:"Start",close:"Close",menu:"Menu",
+         en:{play:"New Game",load:"Load",settings:"Settings",back:"Back",start:"Start",close:"Close",menu:"Menu",
   map:"Map",diff:"Bot difficulty",players:"Players",lang:"Language",vol:"Volume",mus:"Music",edge:"Edge scroll",quality:"Graphics",
   saves:"Saves",pause:"Pause",resume:"Resume",save:"Save",exit:"Menu",
   victory:"VICTORY!",defeat:"DEFEAT",vsub:"Enemies defeated!",dsub:"Your team lost.",
@@ -7871,7 +7871,6 @@ if(u._healTimer<=0){
             return;
           }
           
-                                        u.moving=false;
           if(u.hp<=0 && !u.dying){this._handleUnitDeath(u);return;}
           if(u.dying){u.deathT+=dt;if(u.deathT>1.6)u.dead=true;return;}
   if(u._insideMine && (!u.gatherTarget || u.gatherTarget.dead || u.gatherTarget.amount<=0 || u.gatherTarget.falling)){
@@ -12990,7 +12989,6 @@ AIController.prototype.getEnemyComposition=function(){
 };
 
       Renderer.prototype.drawUnit=function(u){
-  if(u._insideMine) return;
   var ctx=this.ctx,z=this.g.camera.zoom;
   var _alpha=this._frameAlpha!==undefined?this._frameAlpha:1;
   var _ix=(u._prevX!==undefined&&!u.dying)?(u._prevX+(u.x-u._prevX)*_alpha):u.x;
@@ -15912,7 +15910,6 @@ else if(sel.length){
         _f._retreating=true;
       }
       self.showHint('Отступление',1.2);
-          self.showHint('Отступление',1.2);
     },false,false,'Отступить\nПриказ вернуться к ратуше.\nИспользуется для спасения раненых юнитов.',undefined,'B');
     this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
       g.selectAllCombat();
