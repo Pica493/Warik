@@ -554,7 +554,7 @@ sawmillMax:"Sawmill MAX",sawmillUpgrading:"Sawmill upgrading",
 upgradeSawmillTo:"Upgrade sawmill→",needTHLvl:"Requires Town Hall lv.",
 sawmillUpgTip:"Upgrade sawmill to lv.{n}\nAll owner's buildings +{p}% HP\n(Does not stack with other sawmills)\nTime: {t}s",
 groupN:"Group",summonLbl:"Summon",lvlShort:"Lv.",
-resurrectCancelTip:"Cancel resurrection. Refunds full cost."};
+resurrectCancelTip:"Cancel resurrection. Refunds full cost."}};
 var LC='ru';
 function t_(k){if(!T[LC]) LC='ru';if(T[LC][k]!==undefined) return T[LC][k];if(T.ru[k]!==undefined) return T.ru[k];return k;}
 Settings.load();
@@ -9059,7 +9059,7 @@ Game.prototype.doGather=function(u,dt){
         }
         var freeSlot=-1;
         for(var s=0;s<MAX_GATHER_PER_MINE;s++){ if(!used[s]){freeSlot=s;break;} }
-              if(freeSlot<0){          // ← БЫЛО _slotFree<0, СТАЛО freeSlot<0
+              if(freeSlot<0){         
         // ПАТЧ #11: не ждём — ищем другую шахту или отменяем
         u._mineSlot=-1;
         u._insideMine=false;u._waitingForMine=false;u._stuckTimer=0;u._stuckCheckTimer=0;u.moving=false;
@@ -13086,7 +13086,6 @@ AIController.prototype.getEnemyComposition=function(){
   ctx.save();ctx.globalAlpha=alpha*vf;
   if(u._isSummon) ctx.globalAlpha*=0.55;
   ctx.translate(p.x,p.y-6*z);if(rot) ctx.rotate(rot);ctx.translate(-p.x,-p.y+6*z);
-  if(u._insideMine){ctx.globalAlpha=alpha*vf*0.85;}
   var ringR=u.isHero?28:20;
   var isOwn=(u.pid===this.g.playerPid);
   var isAllied=(u.team===this.g.playerTeam)&&!isOwn&&!u.dying;
