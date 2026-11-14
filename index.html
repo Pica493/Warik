@@ -14273,8 +14273,11 @@ UISys.prototype._renderKeySettings=function(){
     {k:'jumpHero',n:'Перейти к герою'},
     {k:'camUp',n:'Камера вверх'},
     {k:'camDown',n:'Камера вниз'},
-    {k:'camLeft',n:'Камера влево'},
-    {k:'camRight',n:'Камера вправо'}
+        {k:'camLeft',n:'Камера влево'},
+    {k:'camRight',n:'Камера вправо'},
+    {k:'cancelBuild',n:'Отмена постройки'},
+    {k:'demolish',n:'Снести здание'},
+    {k:'deselect',n:'Снять выделение'}
   ];
   list.innerHTML='';
   for(var i=0;i<defs.length;i++){
@@ -15796,7 +15799,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
     g.selectAllCombat();
     self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
   },false,false,'Выделить всех войск');
-  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
+      this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,(Settings.keys.deselect||'x').toUpperCase());
 }
 else if(sel.length){
   var workers=[],fighters=[];
@@ -15921,7 +15924,7 @@ else if(sel.length){
       self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
     },false,false,'Выделить всех войск');
   }
-  this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
+      this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,(Settings.keys.deselect||'x').toUpperCase());
 }
 
       if(selB.length){
@@ -16216,11 +16219,11 @@ else if(sel.length){
     }
         if(!b2.completed){
       var cancelTip=t_('cancel')+': '+b2.costGold+'+'+b2.costWood;
-      this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip,undefined,'C');
+            this.addAction(box,toolIconImg('cancel'),t_('cancel'),null,function(){self.cancelConstruction(b2);},false,false,cancelTip,undefined,(Settings.keys.cancelBuild||'c').toUpperCase());
     } else if(b2.kind!=='townhall'){
-      this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);},false,false,null,undefined,'D');
+            this.addAction(box,toolIconImg('demolish'),t_('demolish'),null,function(){self.demolish(b2);},false,false,null,undefined,(Settings.keys.demolish||'d').toUpperCase());
     }
-    this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,'X');
+        this.addAction(box,toolIconImg('deselect'),t_('deselect'),null,function(){g.deselectAll();},false,false,'Снять выделение',undefined,(Settings.keys.deselect||'x').toUpperCase());
   }
 };
 
