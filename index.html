@@ -324,7 +324,7 @@ var BLD_NAMES={
       gromborn:{townhall:"Chief's Fortress",house:'Long House',barracks:'Blood Grounds',tower:'Totem Pillar',lumber:'Lumber Cut',magic:'Spirit Shrine',forge:'War Forge',altar:'Blood Totem'},
       sylvanid:{townhall:'Great Tree',house:'Hollow Den',barracks:'War Circle',tower:'Guardian Tree',lumber:'Saw Grove',magic:'Druid Circle',forge:'Thorn Forge',altar:'Moon Stone'}}
 };
-var DEFAULT_KEYS={ability1:'q',ability2:'w',ability3:'e',ability4:'r',attack:'a',stop:'s',patrol:'p',selectAll:'a',jumpHero:'f1',camUp:'arrowup',camDown:'arrowdown',camLeft:'arrowleft',camRight:'arrowright',toMine:'g',toWood:'l',build:'b',repair:'r'};
+var DEFAULT_KEYS={ability1:'q',ability2:'w',ability3:'e',ability4:'r',attack:'a',stop:'s',patrol:'p',selectAll:'a',jumpHero:'f1',camUp:'arrowup',camDown:'arrowdown',camLeft:'arrowleft',camRight:'arrowright',toMine:'g',toWood:'l',build:'b',repair:'r',cancelBuild:'c',demolish:'d',deselect:'x'};
 var Settings={volume:0.4,music:0.25,edgeScroll:1,language:'ru',difficulty:'normal',quality:'medium',_isMobile:false,keys:JSON.parse(JSON.stringify(DEFAULT_KEYS)),
   load:function(){try{var s=JSON.parse(localStorage.getItem('echo33')||'{}');for(var k in s) if(this[k]!==undefined) this[k]=s[k];if(this.language&&T[this.language]) LC=this.language;else LC='ru';if(!this.keys||typeof this.keys!=='object') this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));else{for(var dk in DEFAULT_KEYS){if(typeof this.keys[dk]!=='string') this.keys[dk]=DEFAULT_KEYS[dk];}for(var dk2 in this.keys){var _mv=_cyrToLat(this.keys[dk2]);if(_mv!==this.keys[dk2]) this.keys[dk2]=_mv;}}}catch(e){LC='ru';this.keys=JSON.parse(JSON.stringify(DEFAULT_KEYS));}},
   save:function(){try{localStorage.setItem('echo33',JSON.stringify({volume:this.volume,music:this.music,edgeScroll:this.edgeScroll,language:this.language,difficulty:this.difficulty,quality:this.quality,keys:this.keys}));}catch(e){}}};
@@ -433,6 +433,21 @@ hero_inquisitor:"Инквизитор",hero_shaman:"Шаман-изгой",hero_
 e_inq_fire:"Огненный суд",e_inq_mark:"Печать ереси",e_inq_exec:"Казнь",e_inq_wrath:"Божественный гнев",
 e_sha_chain:"Цепная молния",e_sha_totem:"Тотем черепа",e_sha_harvest:"Кровавая жатва",e_sha_quake:"Землетрясение",
 e_hun_mark:"Метка охотника",e_hun_volley:"Залп шипов",e_hun_heal:"Природное лечение",e_hun_arrow:"Стрела луны"},
+               ,
+orders:"Приказы",retreat:"Отступить",setRally:"Указать точку сбора",rallySet:"Точка сбора установлена",rallyClear:"Точка сбора убрана",rallyHint:"ЛКМ — задать. ПКМ на здании с точкой — удалить.",
+holdOn:"Держать вкл",holdOff:"Держать выкл",
+waitTrain:"Сначала дождитесь окончания найма",thUpgrading:"Идёт улучшение ратуши",
+unitLimit:"Лимит юнитов (300) — найм невозможен",useResurrect:"Используйте Воскресить",
+forgeTrainBusy:"Идёт найм войск — дождитесь окончания",resurrecting:"Воскрешение уже идёт",
+cancelled:"Отменено",buildPct:"Стройка",selectedN:"Выбрано",heroLbl:"Герой",
+resurrectingLbl:"Воскрешение",towerUpgTitle:"Улучшение башни (1 из 2, навсегда)",
+towerUpgInProgress:"Улучшение",cancelTowerUpg:"Отменить улучшение",
+cancelTowerUpgTip:"Отменить улучшение башни. Вернёт 50% стоимости",
+sawmillMax:"Лесопилка MAX",sawmillUpgrading:"Улучшение лесопилки",
+upgradeSawmillTo:"Улучшить лесопилку→",needTHLvl:"Требуется Ратуша ур.",
+sawmillUpgTip:"Улучшить лесопилку до ур.{n}\nВсем зданиям владельца +{p}% HP\n(Не складывается с другими лесопилками)\nВремя: {t}с",
+groupN:"Группа",summonLbl:"Призыв",lvlShort:"Ур.",
+resurrectCancelTip:"Отменить воскрешение. Вернёт полную стоимость."
 
                         
          en:{play:"New Game",load:"Load",settings:"Settings",back:"Back",start:"Start",close:"Close",menu:"Menu",
@@ -7164,13 +7179,17 @@ Game.prototype.updateFog=function(){
   var self=this;
     // ПАТЧ J-27: .fill() в 5-10 раз быстрее ручного цикла
   for(var t in this.teamVis){this.teamVis[t].fill(0);}
-  function rev(team,cx,cy,rad){
+    function rev(team,cx,cy,rad){
     var arr=self.teamVis[team];if(!arr) return;
     var x0=Math.max(0,cx-rad),x1=Math.min(c-1,cx+rad);
     var y0=Math.max(0,cy-rad),y1=Math.min(r-1,cy+rad);
     var fog=self.teamFog[team];
+    var r2=rad*rad;
     for(var x=x0;x<=x1;x++){
+      var dx=x-cx;
       for(var y=y0;y<=y1;y++){
+        var dy=y-cy;
+        if(dx*dx+dy*dy>r2) continue;
         var idx=x+y*c;arr[idx]=1;fog[idx]=2;
       }
     }
@@ -7387,7 +7406,9 @@ Game.prototype._hasClearPath=function(x1,y1,x2,y2,radius){
   if(steps<1) steps=1;
   var sx=dx/steps,sy=dy/steps;
   var ux=dx/d,uy=dy/d;
+  // 4 точки: центр, +perp, -perp, +perp*0.7 (диагональ)
   var perpX=-uy*radius,perpY=ux*radius;
+  var diagX=(-uy*0.707+ux*0.707)*radius,diagY=(ux*0.707+uy*0.707)*radius;
   var cx=x1,cy=y1;
   for(var i=0;i<steps;i++){
     cx+=sx;cy+=sy;
@@ -7397,6 +7418,9 @@ Game.prototype._hasClearPath=function(x1,y1,x2,y2,radius){
     if(this._wouldHitBuilding(cx-perpX,cy-perpY,radius,null,false,-1)) return false;
     if(this._wouldHitResource(cx+perpX,cy+perpY,radius,null)) return false;
     if(this._wouldHitResource(cx-perpX,cy-perpY,radius,null)) return false;
+    // ПАТЧ: дополнительная диагональная проверка радиуса
+    if(this._wouldHitBuilding(cx+diagX,cy+diagY,radius*0.75,null,false,-1)) return false;
+    if(this._wouldHitBuilding(cx-diagX,cy-diagY,radius*0.75,null,false,-1)) return false;
   }
   return true;
 };
@@ -10251,11 +10275,11 @@ Game.prototype.handleRightClick=function(sx,sy){
   var w=Renderer_.s2w(sx,sy);
   if(Input.pendingRallyPoint){
     var rb=Input.pendingRallyPoint;
-    if(!rb.dead){rb.rallyPoint={x:w.x,y:w.y};Audio.sfx('click');UI.showHint('Точка сбора установлена',1.5);}
+    if(!rb.dead){rb.rallyPoint={x:w.x,y:w.y};Audio.sfx('click');UI.showHint(t_('rallySet'),1.5);}
     Input.pendingRallyPoint=null;
-    if(UI) UI.hideOrderBar();
+    if(UI){UI.hideOrderBar();UI._lastActionsHash='';}  // ← принудительная перерисовка
     return;
-  }
+}
   var sel=[];
   for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.sel&&u.pid===this.playerPid&&!u.dying) sel.push(u);}
   if(!sel.length){if(Input.pendingOrder){Input.pendingOrder=null;if(UI) UI.hideOrderBar();}return;}
@@ -15557,9 +15581,9 @@ UISys.prototype.showBuildMenu=function(){
       }
       var unlocked=(reqTH<=thLvl);
       var btip=bldName(race,kind)+'\nЗолото: '+def.gold+'\nДерево: '+def.wood+'\nHP: '+def.hp+'\n'+t_('d_'+kind);
-      if(!unlocked) btip='🔒 Требуется Ратуша ур.'+reqTH+'\n\n'+btip;
+      if(!unlocked) btip='🔒 '+t_('needTHLvl')+reqTH+'\n\n'+btip;
       self.addAction(box,buildingIconImg(race,kind),bldName(race,kind)+(!unlocked?' 🔒':''),self.costStr(def.gold,def.wood),function(){
-        if(!unlocked){Game_.notify('Требуется Ратуша ур.'+reqTH);return;}
+        if(!unlocked){Game_.notify(t_('needTHLvl')+reqTH);return;}
         self.startPlacement(kind);
       },false,!unlocked,btip,undefined,hk);
     })(_allKinds[k], _buildKeys[k]);
@@ -16059,6 +16083,21 @@ else if(sel.length){
       }
     }
         if(b2.queue.length>0) this.addAction(box,toolIconImg('cancel'),t_('cancel'),b2.queue.length+'',function(){var qr=b2.queue.shift();if(qr){var rd=RACES[qr.race],qd=rd&&rd.units[qr.role];if(qd) g.addRes(g.playerPid,qd.gold||0,qd.wood||0);}self.renderActions(true);},false,false,null,undefined,'V');
+            if(b2.reviveQueue&&b2.reviveQueue.length>0){
+      this.addAction(box,toolIconImg('cancel'),'✖ '+t_('cancel')+' ('+t_('resurrectingLbl').toLowerCase()+')',
+        b2.reviveQueue.length+'',
+        function(){
+          for(var _ri=0;_ri<b2.reviveQueue.length;_ri++){
+            var _rq=b2.reviveQueue[_ri];
+            var _rd=_rq.reviveData||{};
+            var _hv=getHeroVariant(_rd.race||b2.race,_rq.heroType||'paladin');
+            if(_hv) g.addRes(g.playerPid,_hv.gold||0,_hv.wood||0);
+          }
+          b2.reviveQueue=[];
+          Audio.sfx('click');
+          self.renderActions(true);
+        },false,false,t_('resurrectCancelTip'),undefined,'V');
+    }
     var spawnsUnits=(b2.kind==='townhall'||b2.kind==='barracks'||b2.kind==='magic'||b2.kind==='forge'||b2.kind==='altar');
         if(spawnsUnits&&b2.completed){
       var hasRally=!!b2.rallyPoint;
@@ -16286,6 +16325,8 @@ UISys.prototype.update=function(){
       this._gameOverShown=true;
       var self=this;
       setTimeout(function(){
+        // ПАТЧ: если игра перезапущена — не показываем старый результат
+        if(Game_ !== g) return;
         var go=self.$('gameover');
         self.$('go-title').textContent=g.result==='win'?t_('victory'):t_('defeat');
         self.$('go-sub').textContent=g.result==='win'?t_('vsub'):t_('dsub');
