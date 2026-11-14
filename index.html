@@ -6864,17 +6864,30 @@ function WeaponDrop(x,y,role,race,team,vx,vy){this.x=x;this.y=y;this.role=role;t
 
 Game.prototype.getRes=function(pid){
   if(typeof pid!=='number' && typeof pid!=='string') pid=0;
+  if(!this._resCache) this._resCache={};
+  var _cached=this._resCache[pid];
+  if(_cached){
+    // Возвращаем копию, чтобы случайные мутации не портили кеш
+    return {gold:_cached.gold,wood:_cached.wood,food:_cached.food,maxFood:_cached.maxFood,pop:_cached.pop,maxPop:_cached.maxPop};
+  }
   if(!this.teams[pid]||typeof this.teams[pid]!=='object') this.teams[pid]={gold:0,wood:0};
   var t=this.teams[pid];
   if(typeof t.gold!=='number'||!isFinite(t.gold)||isNaN(t.gold)) t.gold=0;
   if(typeof t.wood!=='number'||!isFinite(t.wood)||isNaN(t.wood)) t.wood=0;
   var food=0,maxFood=0;
-  for(var i=0;i<this.units.length;i++){var u=this.units[i];if(u.pid===pid&&!u.dead&&!u.dying&&!u._isSummon) food+=(FOOD_COST[u.role]||1);}
-  for(var bi=0;bi<this.buildings.length;bi++){var b=this.buildings[bi];if(b.pid===pid&&b.completed&&!b.dead){
-    if(b.kind==='house') maxFood+=8;
-    if(b.kind==='townhall') maxFood+=16;
-  }}
+  for(var i=0;i<this.units.length;i++){
+    var u=this.units[i];
+    if(u.pid===pid&&!u.dead&&!u.dying&&!u._isSummon) food+=(FOOD_COST[u.role]||1);
+  }
+  for(var bi=0;bi<this.buildings.length;bi++){
+    var b=this.buildings[bi];
+    if(b.pid===pid&&b.completed&&!b.dead){
+      if(b.kind==='house') maxFood+=8;
+      if(b.kind==='townhall') maxFood+=16;
+    }
+  }
   if(maxFood>MAX_FOOD) maxFood=MAX_FOOD;
+  this._resCache[pid]={gold:t.gold,wood:t.wood,food:food,maxFood:maxFood,pop:food,maxPop:maxFood};
   return {gold:t.gold,wood:t.wood,food:food,maxFood:maxFood,pop:food,maxPop:maxFood};
 };
 
@@ -6893,6 +6906,7 @@ Game.prototype.getReservedPop=function(pid){
 
       
 Game.prototype.addRes=function(pid,g,w){
+  if(this._resCache) this._resCache={};
   if(typeof pid!=='number' && typeof pid!=='string') pid=0;
   if(!this.teams[pid]||typeof this.teams[pid]!=='object') this.teams[pid]={gold:0,wood:0};
   if(typeof this.teams[pid].gold!=='number'||isNaN(this.teams[pid].gold)) this.teams[pid].gold=0;
@@ -6903,6 +6917,7 @@ Game.prototype.addRes=function(pid,g,w){
   if(w) this.teams[pid].wood+=w;
 };
 Game.prototype.subRes=function(pid,g,w){
+  if(this._resCache) this._resCache={};
   if(typeof pid!=='number' && typeof pid!=='string') pid=0;
   if(!this.teams[pid]) this.teams[pid]={gold:0,wood:0};
   g=Number(g)||0; w=Number(w)||0;
@@ -7489,10 +7504,13 @@ Game.prototype._markAutoAcquire=function(u){
 };
 
       Game.prototype.update=function(dt){
+        this._resCache={};
   if(this.gameOver||this.paused) return;
-  this.time+=dt;this._lastDt=dt;
+    this.time+=dt;this._lastDt=dt;
   if(this.shake>0) this.shake-=dt*3;
-  this.buildSpatialGrid();
+  // Перестраиваем сетку через кадр (или сразу при изменениях карты) — визуально незаметно, ~2× быстрее.
+  this._gridTick=(this._gridTick||0)+1;
+  if(this._gridTick>=2||this.navDirty){this._gridTick=0;this.buildSpatialGrid();}
   this.auraTimer-=dt;if(this.auraTimer<=0){this.auraTimer=1.5;this.updateAuras();}
   this.updateWeather(dt);
   // ПАТЧ 4: кеш рабочих на шахтах — обновление раз в 0.3с
@@ -7634,26 +7652,41 @@ Game.prototype.ejectFromBuildings=function(u){
       u._path=null;u._pathIdx=0;
     }
   }
-  /* ПАТЧ 5.1: выталкивание из деревьев/шахт */
-  for(var _ri=0;_ri<this.resources.length;_ri++){
-    var _r=this.resources[_ri];
-    if(_r.dead||_r.falling) continue;
-    if(_r===u.gatherTarget) continue;   // не выпихиваем рабочего с его же дерева/шахты
-    var _dxr=u.x-_r.x,_dyr=u.y-_r.y;
-    var _rrad = (_r.kind==='gold') ? _r.radius*0.55 : (TREE_RADIUS-4);
-    var _minDr = u.radius + _rrad;
-    var _d2r = _dxr*_dxr + _dyr*_dyr;
-    if(_d2r < _minDr*_minDr){
-      var _dr=Math.sqrt(_d2r);
-      if(_dr<0.01){_dxr=1;_dyr=0;_dr=1;}
-      u.x = this.clampX(_r.x + _dxr/_dr*(_minDr+1));
-      u.y = this.clampY(_r.y + _dyr/_dr*(_minDr+1));
-      u._path=null;u._pathIdx=0;
+  for(var _pass=0; _pass<3; _pass++){
+    var _anyStuck=false;
+    for(var _ri=0;_ri<this.resources.length;_ri++){
+      var _r=this.resources[_ri];
+      if(_r.dead||_r.falling) continue;
+      if(_r===u.gatherTarget && u._insideMine) continue;
+      var _dxr=u.x-_r.x,_dyr=u.y-_r.y;
+      var _rrad = (_r.kind==='gold') ? _r.radius*0.68 : (TREE_RADIUS+2);
+      var _minDr = u.radius + _rrad;
+      var _d2r = _dxr*_dxr + _dyr*_dyr;
+      if(_d2r < _minDr*_minDr){
+        var _dr=Math.sqrt(_d2r);
+        if(_dr<0.01){_dxr=Math.random()-0.5;_dyr=Math.random()-0.5;_dr=Math.sqrt(_dxr*_dxr+_dyr*_dyr);}
+        var _nx=this.clampX(_r.x + _dxr/_dr*(_minDr+2));
+        var _ny=this.clampY(_r.y + _dyr/_dr*(_minDr+2));
+        // Если новый выход тоже в дереве — перебираем 8 углов
+        if(this._wouldHitResource(_nx,_ny,u.radius,_r)){
+          var _baseAng=Math.atan2(_dyr,_dxr);
+          for(var _ai=1;_ai<=8;_ai++){
+            var _ang=_baseAng+(_ai/8)*Math.PI*2;
+            var _tx=this.clampX(_r.x+Math.cos(_ang)*(_minDr+3));
+            var _ty=this.clampY(_r.y+Math.sin(_ang)*(_minDr+3));
+            if(!this._wouldHitResource(_tx,_ty,u.radius,_r)){_nx=_tx;_ny=_ty;break;}
+          }
+        }
+        u.x=_nx;u.y=_ny;
+        u._path=null;u._pathIdx=0;
+        _anyStuck=true;
+      }
     }
+    if(!_anyStuck) break;
   }
 };
 Game.prototype._smartMove=function(u,dx,dy,spd){
-  var d=Math.hypot(dx,dy);if(d<0.01) return false;
+    var d=Math.sqrt(dx*dx+dy*dy);if(d<0.01) return false;
   // свободный проход сквозь своё здание — только когда идёт К цели сбора,
   // но НЕ когда возвращается с грузом
   var _isReturning=(u.role==='worker' && u.carrying && u.carryAmt>=10);
@@ -8369,6 +8402,7 @@ if(_bla && !_bla.dead && !_bla.dying && typeof _bla.pid!=='undefined' && _bla.te
             u2.attackMoveTo=null;u2.target=null;u2.stationed=false;
           }
           this.units.push(u2);
+            if(this._resCache) this._resCache={};
           if(this.stats[b.pid]) this.stats[b.pid].unitsCreated++;
           this.spawnParticles(sx,sy,'#ffe9a8',12);
           if(b.owner==='player'){this.notify(t_('trained')+' '+uName(spawnRace,q.role));Audio.sfx(q.role==='hero'?'hero':'unit_ready',b.x,b.y);}
@@ -8398,8 +8432,9 @@ if(_bla && !_bla.dead && !_bla.dying && typeof _bla.pid!=='undefined' && _bla.te
         hu.maxHp=hd2.hp+70*(hu.level-1);hu.hp=hu.maxHp;hu.dmg=hd2.dmg+5*(hu.level-1);
         hu.maxMana=100+20*(hu.level-1);hu.mana=hu.maxMana;
         if(rd.abilityLevels) hu.abilityLevels=JSON.parse(JSON.stringify(rd.abilityLevels));
-        hu.skillPoints=rd.skillPoints||0;hu.ultUnlocked=!!rd.ultUnlocked;hu.isHero=true;hu.heroType=_ht2;hu._recalc();
+                hu.skillPoints=rd.skillPoints||0;hu.ultUnlocked=!!rd.ultUnlocked;hu.isHero=true;hu.heroType=_ht2;hu._recalc();
         this.units.push(hu);
+        if(this._resCache) this._resCache={};     // ← НОВАЯ СТРОКА
         this.deadHeroes[b.pid+'_'+_ht2]=null;
         this.spawnParticles(sx2,sy2,'#ffe9a8',24);
         if(b.owner==='player') this.notify('Герой воскрешён!');
@@ -8454,7 +8489,7 @@ if(_bla && !_bla.dead && !_bla.dying && typeof _bla.pid!=='undefined' && _bla.te
     }
   }
     if(pushes>0){
-    var len=Math.hypot(pushX,pushY);
+        var len=Math.sqrt(pushX*pushX+pushY*pushY);
     var maxPush=u.radius*1.0;
     if(len>maxPush){
       pushX=(pushX/len)*maxPush;
@@ -14258,7 +14293,7 @@ UISys.prototype._showWc3Tooltip=function(btn,text){
   var _mk=function(k){
     return ' <img src="'+toolIconURL(k,_sz)+'" style="width:'+_sz+'px;height:'+_sz+'px;vertical-align:-2px">';
   };
-  var _icoForKey=function(k){
+    var _icoForKey=function(k){
     var lk=String(k).toLowerCase().trim();
     if(/^(hp|здоровье|health|очки здоровья)$/.test(lk)) return _mk('hp');
     if(/^(урон|damage|атака|attack|дамаг)$/.test(lk)) return _mk('weapon_melee');
@@ -14268,13 +14303,16 @@ UISys.prototype._showWc3Tooltip=function(btn,text){
     if(/^(еда|food)$/.test(lk)) return _mk('meat');
     if(/^(золото|gold|стоимость|cost)$/.test(lk)) return _mk('gold');
     if(/^(дерево|wood)$/.test(lk)) return _mk('wood');
-    if(/^(время|time|кулдаун|cd)$/.test(lk)) return _mk('time');
+    if(/^(время|time|кулдаун|cd|кд|cooldown|перезарядка)$/.test(lk)) return _mk('time');
     if(/^(мана|mana)$/.test(lk)) return _mk('mana');
+    if(/^(оглушение|стан|stun)$/.test(lk)) return _mk('stop');
+    if(/^(длительность|duration)$/.test(lk)) return _mk('time');
     return '';
   };
   var html='<div class="tt-title">'+keyTag+title+'</div>';
-  for(var ss=0;ss<stats.length;ss++){
-    html+='<div class="tt-stat"><span class="k">'+stats[ss].k+':</span><span class="v">'+stats[ss].v+_icoForKey(stats[ss].k)+'</span></div>';
+    for(var ss=0;ss<stats.length;ss++){
+    var _hasImg=/<img/i.test(stats[ss].v);
+    html+='<div class="tt-stat"><span class="k">'+stats[ss].k+':</span><span class="v">'+stats[ss].v+(_hasImg?'':_icoForKey(stats[ss].k))+'</span></div>';
   }
   if(desc.length){
     var descHtml=desc.join('\n');
@@ -15137,6 +15175,25 @@ UISys.prototype._refreshPortraitBars=function(){
   var btn=document.createElement('button');
   btn.className='act-btn'+(active?' active':'')+(cls?' '+cls:'');
   if(disabled) btn.disabled=true;
+      // Извлекаем стоимость только для «ресурсных» цен вида <div>NN<img></div>
+  // (иконки gold/wood). Для ability-цен (КД/мана) формат <div style=...><img>NN — не матчится.
+  if(price && /<div>\d+<img/.test(price)){
+    var _cmatches=price.match(/<div>(\d+)<img/g);
+    if(_cmatches){
+      var _n1=_cmatches[0].match(/\d+/);
+      if(_n1) btn.dataset.costG=_n1[0];
+      if(_cmatches[1]){
+        var _n2=_cmatches[1].match(/\d+/);
+        if(_n2) btn.dataset.costW=_n2[0];
+      }
+    }
+    // Кнопка изначально disabled, но ресурсов хватает → значит disabled по состоянию (не по ресурсам)
+    if(disabled && Game_){
+      var _r0=Game_.getRes(Game_.playerPid);
+      var _cg0=parseInt(btn.dataset.costG)||0, _cw0=parseInt(btn.dataset.costW)||0;
+      if(_r0.gold>=_cg0 && _r0.wood>=_cw0) btn.dataset.lockState='1';
+    }
+  }
   if(hotkey) btn.dataset.hotkey=String(hotkey).toLowerCase();
   var html='';
 if(icon) html+='<div class="ico">'+icon+'</div>';
@@ -15187,24 +15244,56 @@ UISys.prototype.getActionsHash=function(){
   if(!Game_) return '';
   var g=Game_,parts=[];
   var _hasSel=false;
-    var _addRes=function(){if(_hasSel)return;_hasSel=true;var _r=g.getRes(g.playerPid);parts.push('r|'+Math.floor(_r.gold)+'|'+Math.floor(_r.wood)+'|'+_r.food+'|'+_r.maxFood);};
+  var _markSel=function(){if(_hasSel)return;_hasSel=true;parts.push('s');};
+  // Убрали ману/КД/золото/дерево/еду из хеша — они меняются ежекадрово и вызывают flicker.
+  // Актуальное состояние (disabled, КД, мана) обновляют _updateAbilityButtons и _updateButtonStates.
   for(var i=0;i<g.units.length;i++){
     var u=g.units[i];
     if(u.sel&&u.pid===g.playerPid&&!u.dying){
-      _addRes();
-                 parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+(u.ultUnlocked?1:0)+'|'+(u.isHero?('M'+Math.floor((u.mana||0)/10)*10+'C'+Math.floor((u.cdA1||0)+(u.cdA2||0)+(u.cdA3||0)+(u.cdUlt||0))):''));
+      _markSel();
+      var _abHash='';
+      if(u.isHero&&u.heroAbilities&&u.abilityLevels){
+        for(var _ai=0;_ai<u.heroAbilities.length;_ai++){
+          _abHash+=(u.abilityLevels[u.heroAbilities[_ai].id]||0);
+        }
+      }
+      // stun-флаг в хеше — чтобы полоска «ОГЛУШЁН» появлялась/исчезала сразу
+      var _stunF=(u.stunT>0||u.rootT>0)?'S':'';
+      parts.push('u'+u.id+'|'+u.role+'|'+u.stance+'|'+u.level+'|'+u.skillPoints+'|'+
+                 (u.ultUnlocked?1:0)+'|'+(u.isHero?1:0)+'|'+_abHash+'|'+_stunF);
     }
   }
   for(var bi=0;bi<g.buildings.length;bi++){
     var b=g.buildings[bi];
     if(b.sel&&b.pid===g.playerPid){
-      _addRes();
+      _markSel();
       var q='';for(var qi=0;qi<b.queue.length;qi++) q+=b.queue[qi].role.charAt(0);
-      parts.push('b'+b.id+'|'+b.kind+'|'+b.queue.length+'|'+q+'|'+(b.upgrading?1:0)+'|'+b.level+'|'+(b.techUpgrading?(b.techUpgrading.role+'.'+b.techUpgrading.stat):'')+'|'+(b.completed?1:0)+'|'+(b.rallyPoint?('R'):'')+'|'+(b.sawmillLevel||0)+'|'+(b.sawmillUpgrading?1:0)+'|'+(b.reviveQueue&&b.reviveQueue.length?1:0)+'|'+(b.towerUpgrade||'')+'|'+(b._pendingUpgrade||'')+'|'+(b._towerUpgrading?1:0));
+      parts.push('b'+b.id+'|'+b.kind+'|'+b.queue.length+'|'+q+'|'+(b.upgrading?1:0)+'|'+b.level+'|'+
+        (b.techUpgrading?(b.techUpgrading.role+'.'+b.techUpgrading.stat):'')+'|'+(b.completed?1:0)+'|'+
+        (b.rallyPoint?'R':'')+'|'+(b.sawmillLevel||0)+'|'+(b.sawmillUpgrading?1:0)+'|'+
+        (b.reviveQueue&&b.reviveQueue.length?1:0)+'|'+(b.towerUpgrade||'')+'|'+
+        (b._pendingUpgrade||'')+'|'+(b._towerUpgrading?1:0));
     }
   }
   if(!_hasSel) return '';
   return parts.join(';');
+};
+      UISys.prototype._updateButtonStates=function(){
+  if(!Game_) return;
+  var box=this.$('actions');if(!box) return;
+  var res=Game_.getRes(Game_.playerPid);
+  var btns=box.querySelectorAll('.act-btn');
+  for(var i=0;i<btns.length;i++){
+    var btn=btns[i];
+    if(btn.dataset.abId) continue;
+    if(btn.dataset.lockState==='1') continue;
+    if(btn.dataset.costG===undefined) continue;
+    var cg=parseInt(btn.dataset.costG)||0;
+    var cw=parseInt(btn.dataset.costW)||0;
+    var canAfford=(res.gold>=cg)&&(res.wood>=cw);
+    if(!canAfford && !btn.disabled) btn.disabled=true;
+    else if(canAfford && btn.disabled) btn.disabled=false;
+  }
 };
 UISys.prototype.costStr=function(g,w){
   var s='';
@@ -15529,20 +15618,19 @@ UISys.prototype.renderActions=function(force){
   if(activeU&&activeU.isHero){
     var hero=activeU,abils=hero.heroAbilities;
     var _stunnedHero=(hero.stunT>0||hero.rootT>0);
-    var manaDiv=document.createElement('div');
+        var manaDiv=document.createElement('div');
+    manaDiv.className='hero-mana-bar';
     manaDiv.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:4px 6px;background:#0d1420;border:1px solid #3d4c68;border-radius:5px;margin-bottom:4px';
     var curMana=hero.mana||0,maxMana=Math.max(1,hero.maxMana||100);
     var manaFillPct=Math.round((curMana/maxMana)*100);
     var needXP=(hero.level*hero.level*30+40);
     var prevXP=(hero.level-1)*(hero.level-1)*30+40;
     var lvlPct=Math.round(Math.max(0,Math.min(1,(hero.exp-prevXP)/(needXP-prevXP)))*100);
-    manaDiv.innerHTML='<span style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div><span style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span><div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
+    manaDiv.innerHTML='<span class="mana-text" style="font-size:10px;color:#9ab;min-width:44px">'+t_('mana')+' '+Math.floor(curMana)+'/'+maxMana+'</span>'+
+      '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="mana-fill" style="width:'+manaFillPct+'%;height:100%;background:linear-gradient(90deg,#3060c0,#80c0ff)"></div></div>'+
+      '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">Ур.'+hero.level+' '+lvlPct+'%</span>'+
+      '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
-    if(_stunnedHero){
-      var _stunBar=document.createElement('div');
-      _stunBar.style.cssText='grid-column:1/-1;padding:4px 6px;background:rgba(120,30,30,0.5);border:1px solid #a04040;border-radius:5px;margin-bottom:4px;color:#ffd0d0;font-size:11px;font-weight:700;text-align:center';
-      _stunBar.textContent='ОГЛУШЁН / ОБЕЗДВИЖЕН — способности недоступны ('+Math.max(hero.stunT||0,hero.rootT||0).toFixed(1)+'с)';
-      box.appendChild(_stunBar);
     }
     for(var ai=0;ai<abils.length;ai++){
       (function(ab,abIdx){
@@ -15637,12 +15725,12 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
     var _heroGroup=[hero];
   for(var _hz=0;_hz<sel.length;_hz++){if(sel[_hz]!==hero&&sel[_hz].role!=='worker') _heroGroup.push(sel[_hz]);}
   var _sepC=document.createElement('div');_sepC.className='section-sep';_sepC.textContent='Приказы';box.appendChild(_sepC);
-    this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,null,undefined,'A');
-  this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,null,undefined,'S');
-  this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,null,undefined,'P');
-  this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
-  this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
-  this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
+      this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,'Атака-движение [A]\nИдти в точку, атакуя всех врагов на пути.\nПКМ — указать цель.',undefined,'A');
+  this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,'Стоп [S]\nОстановить выделенных юнитов.\nДвойное нажатие — переключить на агрессивную стойку.',undefined,'S');
+  this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,'Патруль [P]\nЮнит ходит между двумя точками, атакуя врагов.\nПКМ — указать вторую точку.',undefined,'P');
+    this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line',false,'Строй: Линия\nЮниты встают в шеренгу.\nОптимально для стрелков и магов.',undefined,'1');
+  this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column',false,'Строй: Колонна\nЮниты встают в колонну.\nУдобно для узких проходов.',undefined,'2');
+  this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation,false,'Строй: Коробка\nЮниты встают квадратом.\nУниверсальный вариант.',undefined,'3');
   var _isHoldHero=hero.stance==='hold';
   this.addAction(box,toolIconImg('hold'),(_isHoldHero?'✕ ':'')+t_('hold'),null,function(){
     var _ns=_isHoldHero?'aggressive':'hold';
@@ -15652,7 +15740,9 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
     }
     self.showHint((_ns==='hold'?'Держать вкл':'Держать выкл'),1);
     self.renderActions(true);
-  },_isHoldHero,false,_isHoldHero?'Стойка: держать позицию':'Стойка: агрессивная');
+    },_isHoldHero,false,
+    _isHoldHero?'Стойка: Держать позицию\nЮнит не преследует врагов, только отвечает на атаки.\nПовторное нажатие — вернуть агрессию.'
+               :'Стойка: Агрессивная\nЮнит преследует врагов в радиусе видимости.\nПолезно для контроля карты.');
   this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
     var _th=null,_bdT=Infinity;
     for(var _fi=0;_fi<g.buildings.length;_fi++){
@@ -15669,7 +15759,8 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
       _ff._path=null;_ff._pathIdx=0;_ff._retreating=true;
     }
     self.showHint('Отступление',1.2);
-  });
+      self.showHint('Отступление',1.2);
+  },false,false,'Отступить\nПриказ вернуться к ратуше.\nИспользуется для спасения раненых юнитов.',undefined,'B');
   this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
     g.selectAllCombat();
     self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
@@ -15755,13 +15846,13 @@ else if(sel.length){
     }
        this.addAction(box,'<img src="'+getWorkersIconURL(race)+'" alt="">',t_('workersAll'),null,function(){g.selectWorkers();},false,false,'Выделить всех рабочих',undefined,'Tab');
   }
-  if(fighters.length){
-        this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,null,undefined,'A');
-    this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,null,undefined,'S');
-    this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,null,undefined,'P');
-    this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line');
-    this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column');
-    this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation);
+    if(fighters.length){
+        this.addAction(box,toolIconImg('attack'),'A-move',null,function(){Input.clearPending('order');Input.pendingOrder='attack';self.showOrderBar(t_('atkMove'));},Input.pendingOrder==='attack',false,'Атака-движение [A]\nИдти в точку, атакуя всех врагов на пути.\nПКМ — указать цель.',undefined,'A');
+    this.addAction(box,toolIconImg('stop'),'Стоп',null,function(){Input.pendingOrder=null;self.hideOrderBar();g.stopSelected();},false,false,'Стоп [S]\nОстановить выделенных юнитов.\nДвойное нажатие — переключить на агрессивную стойку.',undefined,'S');
+    this.addAction(box,toolIconImg('patrol'),'Патруль',null,function(){Input.clearPending('order');Input.pendingOrder='patrol';self.showOrderBar(t_('patrol'));},Input.pendingOrder==='patrol',false,'Патруль [P]\nЮнит ходит между двумя точками, атакуя врагов.\nПКМ — указать вторую точку.',undefined,'P');
+      this.addAction(box,toolIconImg('line'),t_('line'),null,function(){Input.formation='line';self.showHint(t_('line'),1);},Input.formation==='line',false,'Строй: Линия\nЮниты встают в шеренгу.\nОптимально для стрелков и магов.',undefined,'1');
+  this.addAction(box,toolIconImg('column'),t_('column'),null,function(){Input.formation='column';self.showHint(t_('column'),1);},Input.formation==='column',false,'Строй: Колонна\nЮниты встают в колонну.\nУдобно для узких проходов.',undefined,'2');
+  this.addAction(box,toolIconImg('box'),t_('box'),null,function(){Input.formation='box';self.showHint(t_('box'),1);},Input.formation==='box'||!Input.formation,false,'Строй: Коробка\nЮниты встают квадратом.\nУниверсальный вариант.',undefined,'3');
     var isHold=fighters[0].stance==='hold';
     this.addAction(box,toolIconImg('hold'),(isHold?'✕ ':'')+t_('hold'),null,function(){
       var newStance=isHold?'aggressive':'hold';
@@ -15771,7 +15862,9 @@ else if(sel.length){
       }
       self.showHint((newStance==='hold'?'Держать вкл':'Держать выкл'),1);
       self.renderActions(true);
-    },isHold,false,isHold?'Стойка: держать позицию (не преследовать)':'Стойка: агрессивная (преследовать врагов)');
+        },isHold,false,
+      isHold?'Стойка: Держать позицию\nЮнит не преследует врагов, только отвечает на атаки.\nПовторное нажатие — вернуть агрессию.'
+            :'Стойка: Агрессивная\nЮнит преследует врагов в радиусе видимости.\nПолезно для контроля карты.');
     this.addAction(box,toolIconImg('stop'),'⏹ Отступить',null,function(){
       var th=null,bdT=Infinity;
       for(var fi=0;fi<g.buildings.length;fi++){
@@ -15790,7 +15883,8 @@ else if(sel.length){
         _f._retreating=true;
       }
       self.showHint('Отступление',1.2);
-    });
+          self.showHint('Отступление',1.2);
+    },false,false,'Отступить\nПриказ вернуться к ратуше.\nИспользуется для спасения раненых юнитов.',undefined,'B');
     this.addAction(box,toolIconImg('all'),t_('all'),null,function(){
       g.selectAllCombat();
       self.renderActions(true);if(self.refreshUnitBar) self.refreshUnitBar();
@@ -16085,7 +16179,32 @@ else if(sel.length){
 };
 
       UISys.prototype._updateAbilityButtons=function(){
-  if(!this._abilityButtons||!this._abilityButtons.length||!Game_) return;
+  if(!Game_) return;
+  // Обновляем mana/XP-бар героя без пересборки панели
+  var _mb=document.querySelector('.hero-mana-bar');
+  if(_mb){
+    var _hero=null;
+    for(var _hu=0;_hu<Game_.units.length;_hu++){
+      var _u=Game_.units[_hu];
+      if(_u.sel&&_u.pid===Game_.playerPid&&_u.isHero&&!_u.dying){_hero=_u;break;}
+    }
+    if(_hero){
+      var _cm=_hero.mana||0,_mm=Math.max(1,_hero.maxMana||100);
+      var _mp=Math.round((_cm/_mm)*100);
+      var _nx=_hero.level*_hero.level*30+40;
+      var _px=(_hero.level-1)*(_hero.level-1)*30+40;
+      var _lp=Math.round(Math.max(0,Math.min(1,(_hero.exp-_px)/(_nx-_px)))*100);
+      var _mt=_mb.querySelector('.mana-text');
+      var _lt=_mb.querySelector('.lvl-text');
+      var _mf=_mb.querySelector('.mana-fill');
+      var _lf=_mb.querySelector('.lvl-fill');
+      if(_mt) _mt.textContent=t_('mana')+' '+Math.floor(_cm)+'/'+_mm;
+      if(_lt) _lt.textContent='Ур.'+_hero.level+' '+_lp+'%';
+      if(_mf) _mf.style.width=_mp+'%';
+      if(_lf) _lf.style.width=_lp+'%';
+    }
+  }
+  if(!this._abilityButtons||!this._abilityButtons.length) return;
   var hero=null;
   for(var _ai=0;_ai<this._abilityButtons.length;_ai++){
     var _btn=this._abilityButtons[_ai];
@@ -16162,16 +16281,12 @@ UISys.prototype.update=function(){
     this._infoTimer=(this._infoTimer||0)+1;
     if(this._infoTimer>=3){this._infoTimer=0;this.refreshInfoOnly();this._refreshPortraitBars();}
     if(!Settings._isMobile && Input.mouseInside) this._showUnitHoverTip();
-        // ПАТЧ B-fix: раз в 0.5с пересоздаём кнопки, чтобы disabled-состояние 
-    // отражало актуальные ресурсы (даже если хеш не изменился).
-    // Не пересоздаём, если мышь над панелью — чтобы не сбить tooltip.
+            // Обновляем disabled-состояние кнопок раз в 0.5с БЕЗ пересборки (без мигания).
     this._btnRefreshT=(this._btnRefreshT||0)+1;
     if(this._btnRefreshT>=30){
       this._btnRefreshT=0;
       if(box.dataset.menu!=='build'&&box.dataset.menu!=='placing'){
-        var _hoverActions=false;
-        try{ if(document.querySelector('#actions:hover')) _hoverActions=true; }catch(e){}
-        if(!_hoverActions) this._lastActionsHash='';
+        this._updateButtonStates();
       }
     }
 
@@ -16561,10 +16676,38 @@ function clearAllCaches(){
       if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
       var r=canvas.getBoundingClientRect();
       self.mouseX=e.clientX-r.left;self.mouseY=e.clientY-r.top;self.mouseInside=true;
+            // Space + ЛКМ drag → панорамирование камеры
+      if((self.keys[' ']||self.keys['space']) && self.boxSelect && self.boxSelect.active){
+        var _sdx=self.mouseX-self.boxSelect.x1;
+        var _sdy=self.mouseY-self.boxSelect.y1;
+        if(Math.abs(_sdx)>2||Math.abs(_sdy)>2){
+          Game_.camera.x-=_sdx/Game_.camera.zoom;
+          Game_.camera.y-=_sdy/Game_.camera.zoom;
+          clampCam();
+          self.boxSelect.x1=self.mouseX;self.boxSelect.y1=self.mouseY;
+          self.boxSelect.x2=self.mouseX;self.boxSelect.y2=self.mouseY;
+          return;
+        }
+      }
       if(self.dragging&&Game_){var dx=e.clientX-self.dragging.x,dy=e.clientY-self.dragging.y;Game_.camera.x-=dx/Game_.camera.zoom;Game_.camera.y-=dy/Game_.camera.zoom;clampCam();self.dragging.x=e.clientX;self.dragging.y=e.clientY;}
       if(self.boxSelect&&self.boxSelect.active){self.boxSelect.x2=self.mouseX;self.boxSelect.y2=self.mouseY;}
     });
-    canvas.addEventListener('mouseleave',function(){self.mouseInside=false;});
+        // Запоминаем, в каком направлении мышь покинула окно — камера должна
+    // продолжать лететь в эту сторону (как в WC3 при уходе курсора за край).
+    canvas.addEventListener('mouseleave',function(e){
+      var r=canvas.getBoundingClientRect();
+      var x=e.clientX-r.left,y=e.clientY-r.top;
+      var _ex=0,_ey=0;
+      if(x<=2) _ex=-1;
+      else if(x>=r.width-2) _ex=1;
+      if(y<=2) _ey=-1;
+      else if(y>=r.height-2) _ey=1;
+      self._exitDir=(_ex||_ey)?{x:_ex,y:_ey}:null;
+      self.mouseInside=false;
+    });
+    canvas.addEventListener('mouseenter',function(){
+      self._exitDir=null;
+    });
     function handleMouseUp(e){
       if(self._ignoreMouseUntil && performance.now() < self._ignoreMouseUntil) return;
       if(e.button===1){self.dragging=null;return;}
@@ -16977,7 +17120,7 @@ canvas.addEventListener('touchstart',function(e){
       self.touchStart=null;self.pinchDist=0;
     });
   },
-  updateCamera:function(dt){
+    updateCamera:function(dt){
     if(!Game_) return;
     var c=Game_.camera,spd=900/c.zoom*dt,dx=0,dy=0;
     var K=(typeof Settings!=='undefined'&&Settings.keys)?Settings.keys:DEFAULT_KEYS;
@@ -16985,9 +17128,9 @@ canvas.addEventListener('touchstart',function(e){
     if(this.keys[K.camDown]) dy+=1;
     if(this.keys[K.camLeft]) dx-=1;
     if(this.keys[K.camRight]) dx+=1;
+    // Скролл у края экрана (мышь внутри окна)
     if(!this.isTouch&&!Settings._isMobile&&Settings.edgeScroll&&this.mouseInside&&Renderer_){
-            // ПАТЧ J-31: на узких экранах не «съедаем» половину
-            var _zone=Math.max(60,Math.min(120,Renderer_.w*0.06));
+      var _zone=Math.max(28,Math.min(56,Renderer_.w*0.035));   // уже = отзывчивее
       var _mx=this.mouseX,_my=this.mouseY,_w=Renderer_.w,_h=Renderer_.h;
       var _ex=0,_ey=0;
       if(_mx<_zone) _ex=-(1-_mx/_zone);
@@ -16998,8 +17141,13 @@ canvas.addEventListener('touchstart',function(e){
       _ex=_ex*Math.abs(_ex);_ey=_ey*Math.abs(_ey);
       if(_ex||_ey){dx+=_ex;dy+=_ey;}
     }
+    // Мышь вышла за пределы окна — продолжаем лететь в направлении выхода
+    if(!this.isTouch&&!Settings._isMobile&&Settings.edgeScroll&&!this.mouseInside&&this._exitDir){
+      dx+=this._exitDir.x;
+      dy+=this._exitDir.y;
+    }
     if(dx||dy){
-      var len=Math.hypot(dx,dy)||1;
+      var len=Math.sqrt(dx*dx+dy*dy)||1;
       if(len>1){dx/=len;dy/=len;}
       c.x+=dx*spd*1.15;c.y+=dy*spd*1.15;
       clampCam();
