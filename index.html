@@ -15661,10 +15661,13 @@ UISys.prototype.renderActions=function(force){
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
     for (var ai = 0; ai < abils.length; ai++) {
-      (function(ab,abIdx){  })(abils[ai], ai);
-    }
+      (function(ab,abIdx){
+        
         var lvl=hero.abilityLevels[ab.id]||0;
         var cd=0;
+
+
+    
         if(ab.type==='passive') cd=0;
         else if(abIdx===0) cd=hero.cdA1;
         else if(abIdx===1) cd=hero.cdA2;
@@ -15741,7 +15744,7 @@ if(!isPassive) price+='<div style="display:inline-flex;align-items:center;gap:1p
               }
             }
           };
-        }
+          }
         if(_btn){
           _btn.dataset.abId=ab.id;
           _btn.dataset.abIdx=String(abIdx);
