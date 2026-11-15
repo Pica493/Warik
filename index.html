@@ -15660,7 +15660,9 @@ UISys.prototype.renderActions=function(force){
       '<span class="lvl-text" style="font-size:10px;color:#e6c67a;min-width:44px;text-align:right">'+t_('lvlShort')+hero.level+' '+lvlPct+'%</span>'+
       '<div style="flex:1;height:6px;background:#000;border-radius:3px;overflow:hidden"><div class="lvl-fill" style="width:'+lvlPct+'%;height:100%;background:linear-gradient(90deg,#8a6a1a,#ffe9a8)"></div></div>';
     box.appendChild(manaDiv);
-      (function(ab,abIdx){
+    for (var ai = 0; ai < abils.length; ai++) {
+      (function(ab,abIdx){  })(abils[ai], ai);
+    }
         var lvl=hero.abilityLevels[ab.id]||0;
         var cd=0;
         if(ab.type==='passive') cd=0;
